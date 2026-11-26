@@ -47,7 +47,7 @@ If a game is already in progress, **Play** offers to resume it or set up a new o
 /
 ├── index.html
 ├── README.md
-├── manifest.webmanifest   install info (name, icons, colors)
+├── manifest.json   install info (name, icons, colors)
 ├── sw.js                  service worker (offline cache)
 ├── icons/                 icon-192.png, icon-512.png, icon-maskable-512.png, apple-touch-icon.png
 ├── css/
