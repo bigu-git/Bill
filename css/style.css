@@ -135,21 +135,18 @@ svg { display: block; }
   width: 70vmax;
   height: 70vmax;
   border-radius: 50%;
-  will-change: transform;
 }
 
 .bg__glow--a {
   left: -30vmax;
   top: -30vmax;
   background: radial-gradient(circle, rgba(199, 53, 69, 0.16), transparent 62%);
-  animation: drift-a 26s ease-in-out infinite alternate;
 }
 
 .bg__glow--b {
   right: -35vmax;
   bottom: -35vmax;
   background: radial-gradient(circle, rgba(128, 102, 156, 0.16), transparent 62%);
-  animation: drift-b 30s ease-in-out infinite alternate;
 }
 
 .bg__grain {
@@ -181,7 +178,7 @@ svg { display: block; }
 
 .screen.is-active {
   display: flex;
-  animation: screen-in 0.5s var(--ease) both;
+  animation: screen-in 0.32s var(--ease) both;
 }
 
 /* Applied briefly by app.js to the screen being left */
@@ -192,7 +189,7 @@ svg { display: block; }
   left: 0;
   right: 0;
   pointer-events: none;
-  animation: screen-out 0.22s ease both;
+  animation: screen-out 0.14s ease both;
 }
 
 .screen-head {
@@ -530,7 +527,7 @@ option { background: #1a1a1e; color: var(--text); }
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 12px;
-  animation: rise 0.35s var(--ease) both;
+  animation: rise 0.28s var(--ease) both;
 }
 
 .player-item.is-removing { animation: fade-out 0.2s ease both; }
@@ -596,16 +593,16 @@ option { background: #1a1a1e; color: var(--text); }
   box-shadow: 0 14px 28px -10px rgba(0, 0, 0, 0.7);
   transform-origin: 50% 160%;
   transform: rotate(var(--r, 0deg));
-  animation: fan-in 0.9s var(--ease) both;
+  animation: fan-in 0.6s var(--ease) both;
   animation-delay: var(--d, 0s);
 }
 
-.fan-card:nth-child(1) { --r: -50deg; --d: 0.05s; }
-.fan-card:nth-child(2) { --r: -30deg; --d: 0.12s; }
-.fan-card:nth-child(3) { --r: -10deg; --d: 0.19s; }
-.fan-card:nth-child(4) { --r: 10deg;  --d: 0.26s; }
-.fan-card:nth-child(5) { --r: 30deg;  --d: 0.33s; }
-.fan-card:nth-child(6) { --r: 50deg;  --d: 0.4s; }
+.fan-card:nth-child(1) { --r: -50deg; --d: 0.02s; }
+.fan-card:nth-child(2) { --r: -30deg; --d: 0.06s; }
+.fan-card:nth-child(3) { --r: -10deg; --d: 0.1s; }
+.fan-card:nth-child(4) { --r: 10deg;  --d: 0.14s; }
+.fan-card:nth-child(5) { --r: 30deg;  --d: 0.18s; }
+.fan-card:nth-child(6) { --r: 50deg;  --d: 0.22s; }
 
 .logo {
   display: flex;
@@ -671,7 +668,7 @@ option { background: #1a1a1e; color: var(--text); }
   letter-spacing: -0.02em;
 }
 
-.turn-info__name.is-changing { animation: name-in 0.5s var(--ease); }
+.turn-info__name.is-changing { animation: name-in 0.32s var(--ease); }
 
 .game-stats {
   display: grid;
@@ -776,13 +773,14 @@ option { background: #1a1a1e; color: var(--text); }
   inset: 0;
   transform-style: preserve-3d;
   -webkit-transform-style: preserve-3d;
+  will-change: transform;
   cursor: pointer;
 }
 
 .card[data-state="idle"] { animation: card-idle 5s ease-in-out infinite; }
-.card[data-state="flipping"] { animation: card-flip 0.95s ease-in-out forwards; cursor: default; }
+.card[data-state="flipping"] { animation: card-flip 0.7s cubic-bezier(0.45, 0.05, 0.2, 1) forwards, card-lift 0.7s ease-in-out; cursor: default; }
 .card[data-state="revealed"] { transform: rotateY(180deg); cursor: default; }
-.card[data-state="resetting"] { animation: card-unflip 0.5s ease-in-out forwards; cursor: default; }
+.card[data-state="resetting"] { animation: card-unflip 0.38s cubic-bezier(0.45, 0.05, 0.2, 1) forwards; cursor: default; }
 
 .card__face {
   position: absolute;
@@ -970,7 +968,7 @@ option { background: #1a1a1e; color: var(--text); }
 .card[data-state="revealed"] .card__text,
 .card[data-state="flipping"] .card__note,
 .card[data-state="revealed"] .card__note {
-  animation: text-in 0.6s 0.4s var(--ease) both;
+  animation: text-in 0.4s 0.3s var(--ease) both;
 }
 
 /* Category chips */
@@ -1023,7 +1021,7 @@ button.chip:active { transform: scale(0.95); }
   gap: 10px;
 }
 
-.card-actions:not([hidden]) { animation: rise 0.4s var(--ease) both; }
+.card-actions:not([hidden]) { animation: rise 0.28s var(--ease) both; }
 .card-actions .btn--ghost { grid-column: 1 / -1; }
 
 /* ---------- 10. QUESTION CREATOR ---------- */
@@ -1037,7 +1035,7 @@ button.chip:active { transform: scale(0.95); }
   border: 1px solid var(--line);
   border-left: 3px solid var(--cat-accent);
   border-radius: 12px;
-  animation: rise 0.35s var(--ease) both;
+  animation: rise 0.28s var(--ease) both;
   transition: opacity 0.2s;
 }
 
@@ -1192,9 +1190,7 @@ button.chip:active { transform: scale(0.95); }
 }
 
 .dialog::backdrop {
-  background: rgba(5, 5, 7, 0.72);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
+  background: rgba(5, 5, 7, 0.8);
 }
 
 .dialog[open] { animation: dialog-in 0.3s var(--ease); }
@@ -1283,13 +1279,13 @@ button.chip:active { transform: scale(0.95); }
 
 /* ---------- 14. KEYFRAMES ---------- */
 @keyframes screen-in {
-  from { opacity: 0; transform: translateY(14px) scale(0.99); }
+  from { opacity: 0; transform: translateY(10px); }
   to   { opacity: 1; transform: none; }
 }
 
 @keyframes screen-out {
-  from { opacity: 1; transform: none; }
-  to   { opacity: 0; transform: translateY(-8px) scale(0.99); }
+  from { opacity: 1; }
+  to   { opacity: 0; }
 }
 
 @keyframes rise {
@@ -1302,8 +1298,8 @@ button.chip:active { transform: scale(0.95); }
 }
 
 @keyframes name-in {
-  from { opacity: 0; transform: translateY(10px); filter: blur(4px); }
-  to   { opacity: 1; transform: none; filter: none; }
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: none; }
 }
 
 @keyframes text-in {
@@ -1324,15 +1320,19 @@ button.chip:active { transform: scale(0.95); }
 
 @keyframes card-idle {
   0%, 100% { transform: translateY(0) rotateZ(0); }
-  50%      { transform: translateY(-6px) rotateZ(0.4deg); }
+  50%      { transform: translateY(-4px) rotateZ(0.25deg); }
 }
 
 /* The flip: lifts toward the viewer, turns 180deg, settles */
 @keyframes card-flip {
-  0%   { transform: translateZ(0) rotateY(0deg) rotateZ(0deg) scale(1); }
-  35%  { transform: translateZ(90px) rotateY(70deg) rotateZ(-2deg) scale(1.04); }
-  70%  { transform: translateZ(110px) rotateY(150deg) rotateZ(1deg) scale(1.06); }
-  100% { transform: translateZ(0) rotateY(180deg) rotateZ(0deg) scale(1); }
+  from { transform: rotateY(0deg); }
+  to   { transform: rotateY(180deg); }
+}
+
+/* Lift runs beside the flip so its peak never stalls the rotation */
+@keyframes card-lift {
+  0%, 100% { translate: 0 0; scale: 1; }
+  50%      { translate: 0 -10px; scale: 1.05; }
 }
 
 @keyframes card-unflip {
@@ -1343,21 +1343,6 @@ button.chip:active { transform: scale(0.95); }
 @keyframes fan-in {
   from { opacity: 0; transform: rotate(0deg) translateY(30px) scale(0.9); }
   to   { opacity: 1; transform: rotate(var(--r, 0deg)); }
-}
-
-@keyframes bob {
-  0%, 100% { translate: 0 0; }
-  50%      { translate: 0 -6px; }
-}
-
-@keyframes drift-a {
-  from { transform: translate(0, 0); }
-  to   { transform: translate(14vmax, 10vmax); }
-}
-
-@keyframes drift-b {
-  from { transform: translate(0, 0); }
-  to   { transform: translate(-12vmax, -14vmax); }
 }
 
 @keyframes dialog-in {
