@@ -21,7 +21,14 @@
   const TOAST_MS = 2600;
   const TOAST_LEAVE_MS = 250;
   const MIN_QUESTION_CHARS = 3;
-  const RESULT_LABELS = { done: 'Done', skipped: 'Skipped', passed: 'Passed' };
+  // Translated text for a key (js/i18n.js holds the dictionaries).
+  function t(key, params) {
+    return NOW.i18n.t(key, params);
+  }
+
+  function resultLabel(result) {
+    return result === 'done' || result === 'skipped' || result === 'passed' ? t('result.' + result) : result;
+  }
   const SVG_NS = 'http://www.w3.org/2000/svg';
 
   /* ---------- UI state (never persisted; game data lives in NOW.game) ---------- */
@@ -116,8 +123,9 @@
     node.style.setProperty('--cat-ink', light ? '#171717' : '#ffffff');
   }
 
+  // Count with its noun in the current language: plural(3, 'card') -> "3 cards".
   function plural(count, word) {
-    return count + ' ' + word + (count === 1 ? '' : 's');
+    return NOW.i18n.plural('n.' + word.replace(' ', '_'), count);
   }
 
   // Shows an inline error (form-error element) and marks an input as invalid.
@@ -203,10 +211,10 @@
       }
 
       const danger = opts.danger !== false;
-      el.confirmTitle.textContent = opts.title || 'Are you sure?';
-      el.confirmMessage.textContent = opts.message || 'This action cannot be undone.';
-      el.confirmOk.textContent = opts.okLabel || 'Confirm';
-      el.confirmCancel.textContent = opts.cancelLabel || 'Cancel';
+      el.confirmTitle.textContent = opts.title || t('confirm.title');
+      el.confirmMessage.textContent = opts.message || t('confirm.msg');
+      el.confirmOk.textContent = opts.okLabel || t('confirm.ok');
+      el.confirmCancel.textContent = opts.cancelLabel || t('confirm.cancel');
       el.confirmOk.classList.toggle('btn--danger', danger);
       el.confirmOk.classList.toggle('btn--primary', !danger);
 
@@ -266,7 +274,7 @@
       else if (name === 'creator') renderCreator();
       else if (name === 'settings') renderSettings();
     } catch (err) {
-      reportError('Could not open this screen.', err);
+      reportError(t('err.screen'), err);
     }
   }
 
@@ -313,11 +321,10 @@
     }
 
     askDialog({
-      title: 'Resume your game?',
-      message: 'A game is in progress (' + plural(game.getCardsDrawn(), 'card') +
-        ' drawn). Continue where you left off, or set up a new game.',
-      okLabel: 'Resume',
-      cancelLabel: 'Set up new game',
+      title: t('play.title'),
+      message: t('play.msg', { cards: plural(game.getCardsDrawn(), 'card') }),
+      okLabel: t('play.ok'),
+      cancelLabel: t('play.cancel'),
       danger: false
     }).then(function (answer) {
       if (answer === 'ok') {
@@ -361,7 +368,7 @@
       if (ui.removing.has(player.id)) item.classList.add('is-removing');
       item.appendChild(make('span', { className: 'player-item__index', text: index + 1 }));
       item.appendChild(make('span', { className: 'player-item__name', text: player.name }));
-      item.appendChild(makeIconButton('trash', 'Remove ' + player.name, 'icon-btn--danger'));
+      item.appendChild(makeIconButton('trash', t('player.remove', { name: player.name }), 'icon-btn--danger'));
       el.playerList.appendChild(item);
     });
 
@@ -371,15 +378,17 @@
     const full = players.length >= max;
     el.playerInput.disabled = full;
     el.btnAddPlayer.disabled = full;
-    el.playerInput.placeholder = full ? 'Player limit reached' : 'Player name';
+    el.playerInput.placeholder = full ? t('setup.limit') : t('setup.name');
 
     const ready = players.length >= min;
     el.btnStartGame.disabled = !ready;
     if (ready) {
-      el.setupHint.textContent = plural(players.length, 'player') + ' ready. Start when you are.';
+      el.setupHint.textContent = t('setup.ready', { players: plural(players.length, 'player') });
     } else {
       const missing = min - players.length;
-      el.setupHint.textContent = 'Add ' + (players.length ? plural(missing, 'more player') : 'at least ' + min + ' players') + ' to start.';
+      el.setupHint.textContent = players.length
+        ? t('setup.need_more', { more: plural(missing, 'more player') })
+        : t('setup.need_min', { min: min });
     }
   }
 
@@ -390,14 +399,14 @@
       // The drawn card belonged to a removed player: put the card back.
       ui.cardShown = false;
       NOW.cards.resetCard();
-      showToast('That player\'s card was discarded.');
+      showToast(t('toast.discarded'));
     }
     if (!result.persisted) warnNotPersisted();
     return result;
   }
 
   function warnNotPersisted() {
-    showToast('Storage is blocked. Changes last only until you close the page.', 4500);
+    showToast(t('toast.storage_changes'), 4500);
   }
 
   function handlePlayerSubmit(event) {
@@ -408,18 +417,18 @@
     const players = NOW.game.getPlayers();
 
     if (!name) {
-      showFieldError(el.playerError, 'Enter a name first.', el.playerInput);
+      showFieldError(el.playerError, t('setup.err.empty'), el.playerInput);
       el.playerInput.focus();
       return;
     }
     if (players.length >= NOW.config.MAX_PLAYERS) {
-      showFieldError(el.playerError, 'You can add up to ' + NOW.config.MAX_PLAYERS + ' players.', el.playerInput);
+      showFieldError(el.playerError, t('setup.err.max', { max: NOW.config.MAX_PLAYERS }), el.playerInput);
       return;
     }
     const lower = name.toLowerCase();
     const duplicate = players.some(function (p) { return p.name.toLowerCase() === lower; });
     if (duplicate) {
-      showFieldError(el.playerError, name + ' is already in the game. Use a different name.', el.playerInput);
+      showFieldError(el.playerError, t('setup.err.dup', { name: name }), el.playerInput);
       el.playerInput.focus();
       el.playerInput.select();
       return;
@@ -455,7 +464,7 @@
   function handleStartGame() {
     const game = NOW.game;
     if (game.getPlayers().length < NOW.config.MIN_PLAYERS) {
-      showToast('Add at least ' + NOW.config.MIN_PLAYERS + ' players to start.');
+      showToast(t('setup.toast.min', { min: NOW.config.MIN_PLAYERS }));
       renderPlayers();
       return;
     }
@@ -473,9 +482,9 @@
 
     if (game.hasProgress()) {
       confirmAction({
-        title: 'Start a new game?',
-        message: 'The current game and its history will be cleared. Players are kept.',
-        okLabel: 'Start new game'
+        title: t('setup.confirm.title'),
+        message: t('setup.confirm.msg'),
+        okLabel: t('setup.confirm.ok')
       }).then(function (ok) { if (ok) begin(); });
     } else {
       begin();
@@ -544,7 +553,7 @@
     const manual = settings.categoryMode === 'manual';
     const disabled = new Set(settings.disabledCategories);
 
-    el.modeLabel.textContent = manual ? 'Choose a category' : 'Random category';
+    el.modeLabel.textContent = t(manual ? 'game.mode.manual' : 'game.mode.random');
     clearChildren(el.categoryChips);
 
     NOW.questions.getCategories().forEach(function (category) {
@@ -634,12 +643,12 @@
     const busy = isBusyNow();
 
     el.card.setAttribute('aria-disabled', active || busy ? 'true' : 'false');
-    el.card.setAttribute('aria-label', active ? 'Current card' : 'Draw a card');
+    el.card.setAttribute('aria-label', t(active ? 'card.aria.current' : 'card.aria.draw'));
 
-    let hint = 'Tap to draw';
-    if (!check.ok && check.reason === 'no-category-selected') hint = 'Pick a category';
-    else if (!check.ok && check.reason === 'no-categories') hint = 'No categories on';
-    else if (!check.ok && check.reason === 'category-unavailable') hint = 'Pick another category';
+    let hint = t('card.hint.tap');
+    if (!check.ok && check.reason === 'no-category-selected') hint = t('card.hint.pick');
+    else if (!check.ok && check.reason === 'no-categories') hint = t('card.hint.none');
+    else if (!check.ok && check.reason === 'category-unavailable') hint = t('card.hint.another');
     el.cardBackHint.textContent = hint;
   }
 
@@ -711,7 +720,7 @@
       renderGame(); // cards-drawn counter, hides the Draw button
       await revealCard(res.card);
     } catch (err) {
-      reportError('Something went wrong drawing the card. Tap the card to try again.', err);
+      reportError(t('err.draw'), err);
     } finally {
       ui.locked = false;
       updateControls();
@@ -728,7 +737,7 @@
     }
     ui.cardShown = shown === true;
     if (!ui.cardShown) {
-      showToast('The card did not open. Tap it to try again.', 3200);
+      showToast(t('toast.card_not_open'), 3200);
       return;
     }
     updateControls();
@@ -745,7 +754,7 @@
     try {
       await revealCard(card);
     } catch (err) {
-      reportError('Could not show the card. Tap it to try again.', err);
+      reportError(t('err.show'), err);
     } finally {
       ui.locked = false;
       updateControls();
@@ -808,9 +817,9 @@
 
       await NOW.cards.resetCard(); // flip back before the next player appears
       renderGame();
-      if (res.ok && res.roundChanged) showToast('Round ' + res.round);
+      if (res.ok && res.roundChanged) showToast(t('toast.round', { n: res.round }));
     } catch (err) {
-      reportError('Something went wrong. The game was kept safe.', err);
+      reportError(t('err.complete'), err);
       renderGame();
     } finally {
       ui.locked = false;
@@ -856,10 +865,10 @@
       const meta = make('div', { className: 'history-item__meta' });
       meta.appendChild(make('span', {
         className: 'history-item__cat',
-        text: entry.categoryName || category.name
+        text: category.unknown ? (entry.categoryName || category.name) : category.name
       }));
       meta.appendChild(make('span', { text: entry.playerName }));
-      meta.appendChild(make('span', { text: RESULT_LABELS[entry.result] || entry.result }));
+      meta.appendChild(make('span', { text: resultLabel(entry.result) }));
       body.appendChild(meta);
 
       item.appendChild(body);
@@ -874,7 +883,7 @@
     try {
       renderHistory();
     } catch (err) {
-      reportError('Could not load the history.', err);
+      reportError(t('err.history'), err);
       return;
     }
     openDialog(el.historyDialog);
@@ -899,7 +908,7 @@
     try {
       NOW.game.rebuildQueues();
     } catch (err) {
-      reportError('Saved, but the game could not refresh its cards.', err);
+      reportError(t('err.refresh_saved'), err);
     }
     if (!persisted) warnNotPersisted();
     return persisted;
@@ -958,13 +967,19 @@
 
   /* ---------- Creator: form and edit mode ---------- */
 
+  // Form title and submit button follow the mode (new / edit) and the language.
+  function refreshFormLabels() {
+    const editing = !!ui.editingId;
+    el.formTitle.textContent = t(editing ? 'creator.edit' : 'creator.new');
+    el.btnSaveQuestion.textContent = t(editing ? 'creator.save' : 'creator.add');
+  }
+
   // question = custom question object to edit, or null for "new question".
   function setEditMode(question) {
     const editing = !!question;
     ui.editingId = editing ? question.id : '';
     el.questionId.value = ui.editingId;
-    el.formTitle.textContent = editing ? 'Edit question' : 'New question';
-    el.btnSaveQuestion.textContent = editing ? 'Save changes' : 'Add question';
+    refreshFormLabels();
     el.btnCancelEdit.hidden = !editing;
     clearFieldError(el.questionError, [el.questionText, el.questionCategory]);
 
@@ -996,17 +1011,17 @@
     const description = NOW.storage.cleanText(el.questionDescription.value, cfg.DESC_MAX);
 
     if (!text) {
-      showFieldError(el.questionError, 'Write a question or challenge first.', el.questionText);
+      showFieldError(el.questionError, t('creator.err.empty'), el.questionText);
       el.questionText.focus();
       return;
     }
     if (Array.from(text).length < MIN_QUESTION_CHARS) {
-      showFieldError(el.questionError, 'Make it a little longer (at least ' + MIN_QUESTION_CHARS + ' characters).', el.questionText);
+      showFieldError(el.questionError, t('creator.err.short', { min: MIN_QUESTION_CHARS }), el.questionText);
       el.questionText.focus();
       return;
     }
     if (!category || !NOW.questions.hasCategory(category)) {
-      showFieldError(el.questionError, 'Choose a category for this question.', el.questionCategory);
+      showFieldError(el.questionError, t('creator.err.cat'), el.questionCategory);
       el.questionCategory.focus();
       return;
     }
@@ -1014,8 +1029,8 @@
     if (duplicate) {
       const where = NOW.questions.categoryName(category);
       showFieldError(el.questionError, duplicate === 'built-in'
-        ? 'This question already exists in ' + where + '.'
-        : 'You already added this question to ' + where + '.', el.questionText);
+        ? t('creator.err.dup_builtin', { where: where })
+        : t('creator.err.dup_custom', { where: where }), el.questionText);
       el.questionText.focus();
       return;
     }
@@ -1027,7 +1042,7 @@
       list[index] = Object.assign({}, list[index], {
         text: text, category: category, difficulty: difficulty, description: description
       });
-      message = 'Question updated.';
+      message = t('creator.toast.updated');
     } else {
       list.push({
         id: NOW.storage.uid('q'),
@@ -1039,7 +1054,7 @@
         custom: true,
         createdAt: Date.now()
       });
-      message = ui.editingId ? 'The old question was gone, so this was added as a new one.' : 'Question added.';
+      message = t(ui.editingId ? 'creator.toast.readded' : 'creator.toast.added');
     }
 
     persistCustomQuestions(list);
@@ -1078,8 +1093,8 @@
     el.customCount.textContent = String(list.length);
     el.customEmpty.hidden = list.length > 0;
     el.customEmpty.textContent = all.length && !list.length
-      ? 'No custom questions in this category.'
-      : 'No custom questions yet. Add your first one above.';
+      ? t('creator.empty_cat')
+      : t('creator.empty');
   }
 
   function buildQuestionItem(question) {
@@ -1108,10 +1123,10 @@
     });
     input.checked = question.enabled !== false;
     toggle.appendChild(input);
-    toggle.appendChild(make('span', { text: 'In game' }));
+    toggle.appendChild(make('span', { text: t('creator.in_game') }));
     actions.appendChild(toggle);
-    actions.appendChild(makeIconButton('edit', 'Edit question', ''));
-    actions.appendChild(makeIconButton('trash', 'Delete question', 'icon-btn--danger'));
+    actions.appendChild(makeIconButton('edit', t('creator.edit_btn'), ''));
+    actions.appendChild(makeIconButton('trash', t('creator.delete_btn'), 'icon-btn--danger'));
     li.appendChild(actions);
     return li;
   }
@@ -1135,16 +1150,16 @@
       setEditMode(question);
     } else if (button.querySelector('use[href="#icon-trash"]')) {
       confirmAction({
-        title: 'Delete this question?',
-        message: '"' + question.text + '" will be removed for good.',
-        okLabel: 'Delete'
+        title: t('creator.del.title'),
+        message: t('creator.del.msg', { text: question.text }),
+        okLabel: t('creator.del.ok')
       }).then(function (ok) {
         if (!ok) return;
         const rest = readCustomQuestions().filter(function (q) { return q.id !== id; });
         persistCustomQuestions(rest);
         if (ui.editingId === id) setEditMode(null);
         renderCustomList();
-        showToast('Question deleted.');
+        showToast(t('creator.toast.deleted'));
       });
     }
   }
@@ -1190,7 +1205,7 @@
 
       const input = make('input', {
         className: 'switch',
-        attrs: { type: 'checkbox', role: 'switch', 'aria-label': 'Enable ' + category.name },
+        attrs: { type: 'checkbox', role: 'switch', 'aria-label': t('settings.enable', { name: category.name }) },
         dataset: { id: category.id }
       });
       input.checked = !disabled.has(category.id);
@@ -1201,6 +1216,10 @@
     el.modeRandom.checked = settings.categoryMode !== 'manual';
     el.modeManual.checked = settings.categoryMode === 'manual';
     el.settingRepeat.checked = settings.allowRepeat === true;
+
+    Array.prototype.forEach.call(doc.querySelectorAll('input[name="language"]'), function (radio) {
+      radio.checked = radio.value === NOW.i18n.getLang();
+    });
   }
 
   function handleCategoryToggle(event) {
@@ -1215,7 +1234,7 @@
 
     const total = NOW.questions.getCategories().length;
     if (disabledIds.length >= total) {
-      showToast('All categories are off. Turn one on to draw cards.', 3500);
+      showToast(t('toast.all_off'), 3500);
     }
   }
 
@@ -1238,7 +1257,7 @@
       if (!valid && usable.length) patch.manualCategory = usable[0].id;
     }
     NOW.game.updateSettings(patch);
-    showToast(manual ? 'Manual: pick a category before each draw.' : 'Random: the game picks the category.');
+    showToast(t(manual ? 'toast.manual' : 'toast.random'));
   }
 
   function handleRepeatChange() {
@@ -1247,28 +1266,28 @@
 
   function handleResetGame() {
     confirmAction({
-      title: 'Reset the game?',
-      message: 'Drawn cards, history and turn order are cleared. Players and settings are kept.',
-      okLabel: 'Reset game'
+      title: t('reset.game.title'),
+      message: t('reset.game.msg'),
+      okLabel: t('reset.game.ok')
     }).then(function (ok) {
       if (!ok) return;
-      return resetGameView().then(function () { showToast('Game reset. Players kept.'); });
+      return resetGameView().then(function () { showToast(t('reset.game.done')); });
     });
   }
 
   function handleResetCustom() {
     confirmAction({
-      title: 'Delete all custom questions?',
-      message: 'Every question you created will be removed for good. Built-in questions stay.',
-      okLabel: 'Delete all'
+      title: t('reset.custom.title'),
+      message: t('reset.custom.msg'),
+      okLabel: t('reset.custom.ok')
     }).then(function (ok) {
       if (!ok) return;
       NOW.storage.resetCustomQuestions();
-      try { NOW.game.rebuildQueues(); } catch (err) { reportError('Could not refresh the cards.', err); }
+      try { NOW.game.rebuildQueues(); } catch (err) { reportError(t('err.refresh'), err); }
       if (ui.editingId) setEditMode(null);
       renderCustomList();
       renderSettings();
-      showToast('Custom questions deleted.');
+      showToast(t('reset.custom.done'));
     });
   }
 
@@ -1351,8 +1370,30 @@
     try {
       fn();
     } catch (err) {
-      reportError('Part of the app failed to start (' + label + ').', err);
+      reportError(t('err.part', { label: label }), err);
     }
+  }
+
+  // Language radios in Settings: switching re-translates the whole app.
+  function bindLanguage() {
+    Array.prototype.forEach.call(doc.querySelectorAll('input[name="language"]'), function (radio) {
+      radio.addEventListener('change', function () {
+        if (radio.checked) NOW.i18n.setLang(radio.value);
+      });
+    });
+    NOW.i18n.onChange(refreshLanguage);
+  }
+
+  // Redraws every part that is built by JavaScript (static HTML is handled by i18n.apply()).
+  function refreshLanguage() {
+    safely('language', function () {
+      renderPlayers();
+      renderGame();
+      renderCreator();
+      refreshFormLabels();
+      renderSettings();
+      if (el.historyDialog.open) renderHistory();
+    });
   }
 
   function bindEvents() {
@@ -1419,7 +1460,7 @@
   }
 
   function checkDependencies() {
-    const parts = ['config', 'storage', 'questions', 'cards', 'game'];
+    const parts = ['config', 'storage', 'i18n', 'questions', 'cards', 'game'];
     const missing = parts.filter(function (name) { return !NOW[name]; });
     if (missing.length) throw new Error('Missing scripts: ' + missing.join(', '));
   }
@@ -1438,11 +1479,15 @@
     }
 
     bindEvents();
+    safely('language', function () {
+      NOW.i18n.apply();
+      bindLanguage();
+    });
 
     try {
       NOW.game.init();
     } catch (err) {
-      reportError('Saved data could not be read. Starting fresh.', err);
+      reportError(t('err.saved_data'), err);
     }
 
     // Make sure exactly one screen is active (home by default).
@@ -1460,7 +1505,7 @@
     });
 
     if (!NOW.storage.isPersistent()) {
-      showToast('Storage is blocked in this browser. Progress will not be saved.', 5000);
+      showToast(t('toast.storage_boot'), 5000);
     }
   }
 
