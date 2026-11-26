@@ -1,0 +1,294 @@
+/* ==========================================================================
+   NOW OR NEVER — css/responsive.css
+   Loaded AFTER style.css. style.css is mobile-first (portrait phones);
+   this file adjusts for: safe areas, small phones, short screens,
+   landscape phones, tablets, desktops and hover devices.
+   Sections:
+   1. Safe areas & fallbacks     2. Small phones      3. Short portrait screens
+   4. Landscape phones           5. Tablet (600px+)   6. Desktop (900px+)
+   7. Large desktop (1200px+)    8. Hover / pointer devices
+   ========================================================================== */
+
+/* ---------- 1. SAFE AREAS & FALLBACKS ---------- */
+
+/* Horizontal padding respects notches in landscape (--gutter is tuned below) */
+.screen {
+  --gutter: 20px;
+  padding-left: max(var(--gutter), env(safe-area-inset-left, 0px));
+  padding-right: max(var(--gutter), env(safe-area-inset-right, 0px));
+}
+
+/* Browsers without dynamic viewport units fall back to vh */
+@supports not (height: 100dvh) {
+  .game-stage { --card-h: clamp(280px, 48vh, 480px); }
+  .dialog--sheet .dialog__panel { max-height: 85vh; }
+  .history-list { max-height: 60vh; }
+}
+
+/* ---------- 2. SMALL PHONES (up to 380px wide) ---------- */
+@media (max-width: 380px) {
+  .screen { --gutter: 16px; }
+
+  .btn {
+    padding: 0 14px;
+    font-size: 13px;
+    letter-spacing: 0.06em;
+  }
+
+  .btn--xl { font-size: 14px; letter-spacing: 0.1em; }
+  .btn--add { min-width: 84px; }
+
+  .home__row { grid-template-columns: 1fr; }
+
+  .home__fan { height: 124px; margin-bottom: 22px; }
+  .fan-card { width: 62px; height: 88px; margin-left: -31px; }
+
+  .field-row { grid-template-columns: 1fr; }
+
+  .panel { padding: 14px; }
+  .dialog__panel { padding: 18px; }
+
+  .chip { padding: 6px 10px; font-size: 11px; }
+
+  .stat__value { font-size: 15px; }
+  .turn-dots { max-width: 84px; }
+}
+
+/* Very narrow (foldables closed, small devices) */
+@media (max-width: 340px) {
+  .dialog__actions { grid-template-columns: 1fr; }
+  .card-actions { grid-template-columns: 1fr; }
+  .q-item__actions { flex-wrap: wrap; }
+}
+
+/* ---------- 3. SHORT PORTRAIT SCREENS ---------- */
+
+/* Compact phones in portrait (e.g. 667px tall) */
+@media (max-height: 700px) and (orientation: portrait) {
+  .game-stage { --card-h: clamp(240px, 44dvh, 420px); padding: 10px 0 18px; }
+  .game-controls { min-height: 100px; }
+  .btn--xl { min-height: 56px; }
+  .home__fan { height: 120px; margin-bottom: 18px; }
+  .fan-card { width: 62px; height: 88px; margin-left: -31px; }
+  .chips { margin-top: 8px; }
+  .chips-wrap { padding-bottom: 10px; }
+}
+
+/* Very short portrait screens: drop decoration, keep the game usable */
+@media (max-height: 560px) and (orientation: portrait) {
+  .home__fan { display: none; }
+  .game-stage { --card-h: clamp(210px, 40dvh, 340px); }
+  .chips-wrap { display: none; }
+}
+
+/* ---------- 4. LANDSCAPE PHONES (short and wide) ---------- */
+@media (orientation: landscape) and (max-height: 520px) {
+  .screen {
+    --gutter: 24px;
+    max-width: 920px;
+    padding-top: calc(var(--safe-top) + 8px);
+    padding-bottom: calc(var(--safe-bottom) + 8px);
+  }
+
+  .screen-head { padding-bottom: 8px; }
+
+  /* Home: logo on the left, menu on the right */
+  .home {
+    flex-direction: row;
+    align-items: center;
+    gap: 28px;
+    padding-top: 0;
+  }
+
+  .home__hero { flex: 1.1; }
+  .home__menu { flex: 1; }
+  .home__fan { display: none; }
+  .logo { font-size: clamp(44px, 14vh, 72px); }
+  .tagline { margin-top: 12px; font-size: 16px; }
+  .btn--xl { min-height: 52px; }
+
+  /* Game: card on the left, info and controls on the right */
+  .screen--game.is-active {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(230px, 310px);
+    grid-template-rows: auto auto auto 1fr auto;
+    column-gap: 22px;
+    row-gap: 0;
+  }
+
+  .screen--game .game-top { grid-column: 1 / -1; grid-row: 1; }
+  .screen--game .game-top .turn-info__name { font-size: 22px; }
+  .screen--game .game-stage { grid-column: 1; grid-row: 2 / span 4; --card-h: clamp(200px, calc(100dvh - 120px), 420px); padding: 4px 0 20px; }
+  .screen--game .game-stats { grid-column: 2; grid-row: 2; padding-top: 4px; }
+  .screen--game .notice { grid-column: 2; grid-row: 3; margin-top: 6px; }
+  .screen--game .chips-wrap { display: block; grid-column: 2; grid-row: 4; align-self: start; padding-top: 6px; }
+  .screen--game .chips { justify-content: flex-start; }
+  .screen--game .chips-label { text-align: left; }
+  .screen--game .game-controls { grid-column: 2; grid-row: 5; min-height: 0; }
+
+  .card-scene { perspective: 1200px; }
+
+  /* Forms and lists use the width */
+  .player-list { grid-template-columns: 1fr 1fr; }
+  .toggle-list { grid-template-columns: 1fr 1fr; }
+
+  .dialog--sheet .dialog__panel { max-height: 90dvh; }
+  .history-list { max-height: 55dvh; }
+}
+
+/* ---------- 5. TABLET (600px and up) ---------- */
+@media (min-width: 600px) {
+  .screen {
+    --gutter: 32px;
+    max-width: 640px;
+    padding-top: calc(var(--safe-top) + 24px);
+    padding-bottom: calc(var(--safe-bottom) + 24px);
+  }
+
+  .screen-title { font-size: 20px; }
+  .screen-body { gap: 16px; }
+
+  .logo { font-size: clamp(88px, 14vw, 120px); }
+  .tagline { font-size: 20px; }
+  .home__fan { height: 180px; margin-bottom: 36px; }
+  .fan-card { width: 90px; height: 128px; margin-left: -45px; }
+
+  .btn { min-height: 56px; font-size: 15px; }
+  .btn--xl { min-height: 66px; font-size: 16px; }
+
+  .player-list { grid-template-columns: 1fr 1fr; }
+  .toggle-list { grid-template-columns: 1fr 1fr; }
+  .legend { grid-template-columns: 1fr 1fr; }
+
+  /* Game: bigger card, more breathing room */
+  .game-stage { --card-h: clamp(340px, 52dvh, 560px); }
+  .game-controls { min-height: 130px; }
+  .turn-info__name { font-size: 34px; }
+  .stat__value { font-size: 18px; }
+
+  .card { --card-radius: 24px; }
+  .card__category { font-size: 13px; }
+  .card__number { font-size: 13px; }
+  .card__note { font-size: 15px; }
+  .card__bottom { font-size: 11px; }
+
+  /* The history sheet becomes a centered modal */
+  .dialog--sheet {
+    width: min(92vw, 520px);
+    margin: auto;
+  }
+
+  .dialog--sheet .dialog__panel {
+    border: 1px solid var(--line-strong);
+    border-radius: var(--r-lg);
+    padding-bottom: 22px;
+  }
+
+  .dialog--sheet[open] { animation: dialog-in 0.3s var(--ease); }
+  .dialog--confirm { width: min(92vw, 420px); }
+
+  .toast { bottom: 32px; }
+}
+
+/* ---------- 6. DESKTOP (900px and up) ---------- */
+@media (min-width: 900px) {
+  .screen--game { max-width: 760px; }
+  .screen--howto { max-width: 720px; }
+
+  .home__fan { height: 210px; margin-bottom: 44px; }
+  .fan-card { width: 100px; height: 142px; margin-left: -50px; }
+
+  .game-stage { --card-h: clamp(380px, 56dvh, 600px); }
+
+  .card__text { font-size: clamp(22px, calc(var(--card-h) * 0.062), 34px); }
+  .card__text.is-long { font-size: clamp(19px, calc(var(--card-h) * 0.052), 28px); }
+  .card__text.is-xlong { font-size: clamp(16px, calc(var(--card-h) * 0.044), 23px); }
+
+  /* Question creator: form on the left, list on the right */
+  .screen--creator { max-width: 1040px; }
+
+  .screen--creator .screen-body {
+    display: grid;
+    grid-template-columns: minmax(320px, 400px) minmax(0, 1fr);
+    column-gap: 32px;
+    row-gap: 14px;
+    align-content: start;
+  }
+
+  .screen--creator .panel {
+    grid-column: 1;
+    grid-row: 1 / span 4;
+    align-self: start;
+    position: sticky;
+    top: calc(var(--safe-top) + 24px);
+  }
+
+  .screen--creator .screen-body > .list-head,
+  .screen--creator .screen-body > .field,
+  .screen--creator .screen-body > .custom-list,
+  .screen--creator .screen-body > .empty {
+    grid-column: 2;
+  }
+
+  .screen--creator .screen-body > .list-head { margin-top: 0; }
+}
+
+/* ---------- 7. LARGE DESKTOP (1200px and up) ---------- */
+@media (min-width: 1200px) {
+  .screen--game { max-width: 820px; }
+  .game-stage { --card-h: clamp(420px, 58dvh, 660px); }
+  .logo { font-size: 128px; }
+}
+
+/* ---------- 8. HOVER / POINTER DEVICES ---------- */
+@media (hover: hover) and (pointer: fine) {
+  /* Card lifts slightly on hover. `translate` is separate from the
+     `transform` used by the idle/flip animations, so they never clash. */
+  .card[data-state="idle"] {
+    transition: translate 0.35s var(--ease);
+  }
+
+  .card[data-state="idle"]:hover {
+    translate: 0 -10px;
+  }
+
+  .card-stack__layer {
+    transition: transform 0.35s var(--ease), opacity 0.35s;
+  }
+
+  .card-scene:hover .card-stack__layer--1 { transform: translateY(13px) scale(0.96); }
+  .card-scene:hover .card-stack__layer--2 { transform: translateY(26px) scale(0.92); }
+
+  .fan-card { transition: filter 0.3s; }
+  .home__fan:hover .fan-card { filter: brightness(1.12); }
+
+  .q-item,
+  .toggle-item,
+  .player-item,
+  .legend__item {
+    transition: border-color 0.2s, background-color 0.2s;
+  }
+
+  .q-item:hover,
+  .toggle-item:hover,
+  .player-item:hover,
+  .legend__item:hover {
+    background: var(--surface-2);
+  }
+
+  .chip:not(:disabled):hover { color: var(--text); border-color: var(--line-strong); }
+  .radio:hover,
+  .switch-row:hover { border-color: var(--line-strong); }
+
+  /* Slim scrollbars for the history list and card text */
+  .history-list,
+  .card__body {
+    scrollbar-width: thin;
+    scrollbar-color: var(--line-strong) transparent;
+  }
+}
+
+/* Touch devices: keep the idle card still while pressed for a crisper feel */
+@media (hover: none) {
+  .card[data-state="idle"]:active { animation-play-state: paused; }
+}
