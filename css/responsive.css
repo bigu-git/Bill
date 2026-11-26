@@ -193,6 +193,8 @@
 @media (min-width: 900px) {
   .screen--game { max-width: 760px; }
   .screen--howto { max-width: 720px; }
+  .screen--library { max-width: 920px; }
+  .lib-list { grid-template-columns: 1fr 1fr; }
 
   .home__fan { height: 210px; margin-bottom: 44px; }
   .fan-card { width: 100px; height: 142px; margin-left: -50px; }
