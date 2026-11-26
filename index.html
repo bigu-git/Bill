@@ -66,6 +66,7 @@
         <nav class="home__menu" aria-label="Main menu" data-i18n-attr="aria-label:home.menu">
           <button class="btn btn--primary btn--xl" id="btn-play" type="button" data-goto="setup" data-i18n="home.play">Play</button>
           <button class="btn btn--secondary" id="btn-create" type="button" data-goto="creator" data-i18n="home.create">Create questions</button>
+          <button class="btn btn--secondary" id="btn-library" type="button" data-goto="library" data-i18n="home.library">All cards</button>
           <div class="home__row">
             <button class="btn btn--ghost" id="btn-howto" type="button" data-goto="howto" data-i18n="home.howto">How to play</button>
             <button class="btn btn--ghost" id="btn-settings" type="button" data-goto="settings" data-i18n="home.settings">Settings</button>
@@ -335,6 +336,28 @@
             <button class="btn btn--danger" id="btn-reset-custom" type="button" data-i18n="settings.reset_custom">Reset custom questions</button>
           </div>
         </section>
+      </div>
+    </section>
+
+    <!-- ===================== ALL CARDS (LIBRARY) ===================== -->
+    <section class="screen screen--library" id="screen-library" data-screen="library" aria-labelledby="library-title">
+      <header class="screen-head">
+        <button class="icon-btn" id="btn-library-back" type="button" data-goto="home" aria-label="Back to home" data-i18n-attr="aria-label:common.back">
+          <svg class="icon" aria-hidden="true" focusable="false"><use href="#icon-back"></use></svg>
+        </button>
+        <h2 class="screen-title" id="library-title" data-i18n="library.title">All cards</h2>
+        <span class="badge" id="library-count">0</span>
+      </header>
+
+      <div class="lib-controls">
+        <label class="sr-only" for="library-search" data-i18n="library.search">Search cards</label>
+        <input class="input" id="library-search" type="search" maxlength="60" placeholder="Search cards" data-i18n-attr="placeholder:library.search" enterkeyhint="search" autocomplete="off">
+        <ul class="chips lib-chips" id="library-chips" aria-label="Filter by category" data-i18n-attr="aria-label:library.filter"></ul>
+      </div>
+
+      <div class="screen-body">
+        <div class="lib-groups" id="library-groups"></div>
+        <p class="empty" id="library-empty" data-i18n="library.empty" hidden>No cards match your search.</p>
       </div>
     </section>
 
