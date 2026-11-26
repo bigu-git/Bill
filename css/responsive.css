@@ -31,11 +31,10 @@
 
   .btn {
     padding: 0 14px;
-    font-size: 13px;
-    letter-spacing: 0.06em;
+    font-size: 15px;
   }
 
-  .btn--xl { font-size: 14px; letter-spacing: 0.1em; }
+  .btn--xl { font-size: 16px; }
   .btn--add { min-width: 84px; }
 
   .home__row { grid-template-columns: 1fr; }
@@ -48,7 +47,7 @@
   .panel { padding: 14px; }
   .dialog__panel { padding: 18px; }
 
-  .chip { padding: 6px 10px; font-size: 11px; }
+  .chip { padding: 6px 10px; font-size: 12px; }
 
   .stat__value { font-size: 15px; }
   .turn-dots { max-width: 84px; }
@@ -153,8 +152,8 @@
   .home__fan { height: 180px; margin-bottom: 36px; }
   .fan-card { width: 90px; height: 128px; margin-left: -45px; }
 
-  .btn { min-height: 56px; font-size: 15px; }
-  .btn--xl { min-height: 66px; font-size: 16px; }
+  .btn { min-height: 56px; font-size: 16px; }
+  .btn--xl { min-height: 66px; font-size: 18px; }
 
   .player-list { grid-template-columns: 1fr 1fr; }
   .toggle-list { grid-template-columns: 1fr 1fr; }
@@ -167,8 +166,8 @@
   .stat__value { font-size: 18px; }
 
   .card { --card-radius: 24px; }
-  .card__category { font-size: 13px; }
-  .card__number { font-size: 13px; }
+  .card__category { font-size: 16px; }
+  .card__number { font-size: 14px; }
   .card__note { font-size: 15px; }
   .card__bottom { font-size: 11px; }
 
