@@ -17,6 +17,7 @@ Plain HTML, CSS and JavaScript. No frameworks, no build step, no backend, no acc
 - **Settings**: turn categories on or off, random or manual category choice, allow or forbid repeated questions.
 - **History** of the cards drawn in the current game.
 - **Resume**: players, settings, custom questions and the running game are saved in the browser.
+- **Two languages: Монгол and English.** All 108 questions and the whole interface are translated. Pick the language in Settings; the first visit uses Mongolian when the browser language is Mongolian, otherwise English.
 - **Drink cards are always optional**: every one carries a non-alcoholic alternative.
 - Respects `prefers-reduced-motion`, supports keyboard play (Enter / Space on the card) and announces the revealed card to screen readers.
 
@@ -55,6 +56,9 @@ If a game is already in progress, **Play** offers to resume it or set up a new o
 │   └── responsive.css
 └── js/
     ├── storage.js     localStorage wrapper, shared config (NOW.config, NOW.storage)
+    ├── i18n.js        translation engine and the English texts (NOW.i18n)
+    ├── lang-mn.js     Mongolian interface texts
+    ├── questions-mn.js  Mongolian text of the 108 built-in questions
     ├── questions.js   categories and built-in questions (NOW.questions)
     ├── cards.js       card flip (NOW.cards)
     ├── game.js        turns, draws, history, settings logic (NOW.game, no DOM access)
@@ -89,6 +93,14 @@ Opening the file directly should work because there are no modules or network re
 5. Choose branch **main** and folder **/ (root)**, then press **Save**.
 6. Wait a minute or two. The site is then available at `https://YOUR-USERNAME.github.io/YOUR-REPOSITORY/`.
 
+## Languages
+
+- Interface texts: English keys live in `js/i18n.js`, Mongolian in `js/lang-mn.js` (same keys). In `index.html` a text is translated with `data-i18n="key"`, an attribute with `data-i18n-attr="aria-label:key"`.
+- Built-in questions: `js/questions.js` keeps the English rows, `js/questions-mn.js` holds the Mongolian text of each row **in the same order**. Ids and difficulty are shared, so history, queues and saved games work in both languages.
+- Questions you create yourself are shown exactly as you typed them, in every language.
+- A card that is already open keeps the language it was drawn in.
+- New language: add `js/lang-xx.js` and `js/questions-xx.js`, list the code in `LANGUAGES` in `js/i18n.js`, add a radio in Settings, and add the files to `index.html` and `sw.js`.
+
 ## Add built-in questions
 
 Open `js/questions.js` and find `BUILT_IN_DATA`. Each category is an array of rows:
@@ -110,7 +122,7 @@ truth: [
 ]
 ```
 
-Ids are generated from the row position (`truth-01`, `truth-02`, ...). Add new rows at the END of a category so existing ids stay the same. Keep every Drink row optional-friendly. To add a new built-in category you would also have to change `BUILT_IN_CATEGORIES` and add matching `[data-cat]` rules in `css/style.css`; this is not covered by the UI.
+When you add a row here, add its translation at the END of the same category in `js/questions-mn.js` too (a row without a translation falls back to English). Ids are generated from the row position (`truth-01`, `truth-02`, ...). Add new rows at the END of a category so existing ids stay the same. Keep every Drink row optional-friendly. To add a new built-in category you would also have to change `BUILT_IN_CATEGORIES` and add matching `[data-cat]` rules in `css/style.css`; this is not covered by the UI.
 
 ## How data is stored
 
