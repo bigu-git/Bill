@@ -1,12 +1,12 @@
 /* NOW OR NEVER — sw.js
    Offline cache for the app shell. Change CACHE_VERSION whenever you
    upload new files, so phones drop the old copy. */
-const CACHE_VERSION = 'now-or-never-v1';
+const CACHE_VERSION = 'now-or-never-v2';
 
 const SHELL = [
   './',
   './index.html',
-  './manifest.webmanifest',
+  './manifest.json',
   './css/style.css',
   './css/responsive.css',
   './js/storage.js',
@@ -24,7 +24,12 @@ const SHELL = [
 self.addEventListener('install', function (event) {
   event.waitUntil(
     caches.open(CACHE_VERSION)
-      .then(function (cache) { return cache.addAll(SHELL); })
+      .then(function (cache) {
+        // One file at a time: a missing file is skipped instead of failing the whole install.
+        return Promise.all(SHELL.map(function (url) {
+          return cache.add(url).catch(function () { /* skip */ });
+        }));
+      })
       .then(function () { return self.skipWaiting(); })
   );
 });
