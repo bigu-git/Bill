@@ -47,6 +47,9 @@ If a game is already in progress, **Play** offers to resume it or set up a new o
 /
 ├── index.html
 ├── README.md
+├── manifest.webmanifest   install info (name, icons, colors)
+├── sw.js                  service worker (offline cache)
+├── icons/                 icon-192.png, icon-512.png, icon-maskable-512.png, apple-touch-icon.png
 ├── css/
 │   ├── style.css
 │   └── responsive.css
@@ -55,10 +58,20 @@ If a game is already in progress, **Play** offers to resume it or set up a new o
     ├── questions.js   categories and built-in questions (NOW.questions)
     ├── cards.js       card flip (NOW.cards)
     ├── game.js        turns, draws, history, settings logic (NOW.game, no DOM access)
-    └── app.js         screens, forms, dialogs, events, startup
+    ├── app.js         screens, forms, dialogs, events, startup
+    └── pwa.js         registers the service worker
 ```
 
 `style.css` must live at `css/style.css`, because `index.html` links it there. The scripts are plain `<script defer>` tags (no ES modules) and must load in this order: `storage`, `questions`, `cards`, `game`, `app`.
+
+## Install on your phone
+
+Once the site is on GitHub Pages (https), open it in the phone browser:
+
+- **Android (Chrome):** menu (three dots) > **Install app** (or **Add to Home screen**).
+- **iPhone (Safari):** Share button > **Add to Home Screen**.
+
+It then opens full screen like an app and works offline after the first visit. When you upload new files, change `CACHE_VERSION` in `sw.js` (for example `now-or-never-v2`), otherwise phones keep showing the old copy.
 
 ## Run locally
 
@@ -121,7 +134,7 @@ What was really verified, and what was not:
 
 - **Checked:** all JavaScript files pass `node --check` (syntax only). Every element id used by `app.js` exists in `index.html`. A smoke test with a hand-written fake DOM ran the real scripts through adding players, starting a game, drawing and finishing a card, the history list, saving a custom question and switching to manual mode, and passed.
 - **Not checked:** the game has not been run in a real browser by the author of these files. That means real card-flip animation timing, layout on real phones and tablets, touch behavior, screen reader output and `localStorage` persistence across an actual page refresh are untested. Please try it on your own phone before a party.
-- **Offline:** there is no service worker. The game keeps working after the page has loaded, and when opened from local files, but a first visit while offline will not load it.
+- **Offline:** a service worker caches the game after the first visit over https (or localhost). It does not run when `index.html` is opened directly from files; the game still works there, just without install and offline caching. A first visit while offline cannot load it.
 - **One device, no sync:** players, questions and progress are not shared between devices or browsers.
 - **Back button:** there is no browser-history handling. The phone's back button leaves the page instead of going to the previous screen.
 - **History limit:** the history keeps the most recent 500 cards.
