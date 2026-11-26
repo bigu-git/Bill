@@ -27,6 +27,18 @@
   const LONG_TEXT = 90;            // text longer than this gets .is-long
   const XLONG_TEXT = 140;          // text longer than this also gets .is-xlong
   const DIFFICULTY_LABELS = { easy: 'Easy', medium: 'Medium', hard: 'Hard' };
+
+  // Translated text (NOW.i18n is optional: English is the fallback).
+  function say(key, params, fallback) {
+    try {
+      if (NOW.i18n && NOW.i18n.exists(key)) return NOW.i18n.t(key, params);
+    } catch (err) { /* use the fallback */ }
+    return fallback;
+  }
+
+  function difficultyLabel(id) {
+    return say('diff.' + id, null, DIFFICULTY_LABELS[id] || '');
+  }
   const CUSTOM_VARS = ['--cat', '--cat-ink', '--cat-accent', '--cat-edge'];
 
   /* ---------- Element cache (grabbed once) ---------- */
@@ -192,7 +204,7 @@
     }
 
     if (els.difficulty) {
-      els.difficulty.textContent = info.difficulty ? DIFFICULTY_LABELS[info.difficulty] : '';
+      els.difficulty.textContent = info.difficulty ? difficultyLabel(info.difficulty) : '';
       els.difficulty.hidden = !info.difficulty;
     }
 
@@ -202,11 +214,14 @@
 
   function buildAnnouncement(info, category) {
     const parts = [];
-    if (info.number) parts.push('Card ' + info.number + '.');
+    if (info.number) parts.push(say('card.n', { n: info.number }, 'Card ' + info.number + '.'));
     parts.push(category.name + '.');
     parts.push(info.text);
     if (info.description) parts.push(info.description);
-    if (info.difficulty) parts.push('Difficulty: ' + DIFFICULTY_LABELS[info.difficulty] + '.');
+    if (info.difficulty) {
+      const label = difficultyLabel(info.difficulty);
+      parts.push(say('card.difficulty', { d: label }, 'Difficulty: ' + label + '.'));
+    }
     return parts.join(' ');
   }
 
