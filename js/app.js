@@ -14,7 +14,7 @@
   const doc = global.document;
 
   /* ---------- Constants ---------- */
-  const SCREENS = ['home', 'setup', 'game', 'creator', 'settings', 'howto'];
+  const SCREENS = ['home', 'setup', 'game', 'creator', 'library', 'settings', 'howto'];
   const LEAVE_MS = 220;          // matches .screen.is-leaving animation
   const NAME_CHANGE_MS = 500;    // matches .is-changing animation
   const REMOVE_MS = 200;         // matches .player-item.is-removing animation
@@ -38,6 +38,8 @@
     cardShown: false,       // true once the drawn card finished flipping
     shownPlayerId: '',      // last player name rendered (to animate changes)
     editingId: '',          // custom question being edited ('' = new)
+    libFilter: 'all',       // category id shown in All cards ('all' = every category)
+    libQuery: '',           // search text in All cards
     removing: new Set(),    // player ids currently fading out
     toastTimer: 0,
     toastHideTimer: 0,
@@ -272,6 +274,7 @@
       if (name === 'setup') renderSetup();
       else if (name === 'game') onEnterGame();
       else if (name === 'creator') renderCreator();
+      else if (name === 'library') renderLibrary();
       else if (name === 'settings') renderSettings();
     } catch (err) {
       reportError(t('err.screen'), err);
@@ -1184,6 +1187,112 @@
     item.classList.toggle('is-disabled', !input.checked);
   }
 
+  /* ---------- All cards (library) ---------- */
+
+  function normalizeSearch(text) {
+    return String(text || '').toLowerCase().replace(/\s+/g, ' ').trim();
+  }
+
+  // Every card in the game (built-in + custom, enabled or not), as a flat list.
+  function libraryCards() {
+    return NOW.questions.getAllIncludingDisabled();
+  }
+
+  function renderLibrary() {
+    const categories = NOW.questions.getCategories();
+    const all = libraryCards();
+    const query = normalizeSearch(ui.libQuery);
+
+    if (ui.libFilter !== 'all' && !categories.some(function (c) { return c.id === ui.libFilter; })) {
+      ui.libFilter = 'all';
+    }
+
+    const matches = function (q) {
+      if (!query) return true;
+      return normalizeSearch(q.text + ' ' + (q.description || '')).indexOf(query) !== -1;
+    };
+
+    // Filter chips (counts follow the search text).
+    clearChildren(el.libraryChips);
+    const chipData = [{ id: 'all', name: t('library.all'), category: null }].concat(
+      categories.map(function (c) { return { id: c.id, name: c.name, category: c }; })
+    );
+    chipData.forEach(function (item) {
+      const count = all.filter(function (q) {
+        return (item.id === 'all' || q.category === item.id) && matches(q);
+      }).length;
+      const chip = make('button', {
+        className: 'chip' + (item.id === 'all' ? ' chip--all' : ''),
+        attrs: { type: 'button', 'aria-pressed': ui.libFilter === item.id ? 'true' : 'false' },
+        dataset: { filter: item.id }
+      });
+      if (item.category) {
+        applyCategoryTheme(chip, item.category);
+        chip.appendChild(make('span', { className: 'chip__dot' }));
+      }
+      chip.appendChild(doc.createTextNode(item.name + ' '));
+      chip.appendChild(make('span', { className: 'chip__count', text: String(count) }));
+      if (ui.libFilter === item.id) chip.classList.add('is-selected');
+      el.libraryChips.appendChild(make('li', {})).appendChild(chip);
+    });
+
+    // Groups of cards.
+    clearChildren(el.libraryGroups);
+    let shown = 0;
+    categories.forEach(function (category) {
+      if (ui.libFilter !== 'all' && ui.libFilter !== category.id) return;
+      const cards = all.filter(function (q) { return q.category === category.id && matches(q); });
+      if (!cards.length) return;
+      shown += cards.length;
+
+      const group = make('section', { className: 'lib-group' });
+      applyCategoryTheme(group, category);
+
+      const head = make('div', { className: 'lib-group__head' });
+      head.appendChild(make('span', { className: 'chip__dot' }));
+      head.appendChild(make('h3', { className: 'lib-group__title', text: category.name }));
+      head.appendChild(make('span', { className: 'badge', text: String(cards.length) }));
+      group.appendChild(head);
+
+      const list = make('ul', { className: 'lib-list' });
+      cards.forEach(function (question, index) {
+        list.appendChild(buildLibraryItem(question, index + 1));
+      });
+      group.appendChild(list);
+      el.libraryGroups.appendChild(group);
+    });
+
+    el.libraryCount.textContent = String(shown);
+    el.libraryEmpty.hidden = shown > 0;
+  }
+
+  function buildLibraryItem(question, number) {
+    const li = make('li', { className: 'q-item q-item--lib' });
+    if (question.custom && question.enabled === false) li.classList.add('is-disabled');
+
+    li.appendChild(make('div', { className: 'q-item__text', text: question.text }));
+
+    const meta = make('div', { className: 'q-item__meta' });
+    meta.appendChild(make('span', { text: '#' + number }));
+    if (question.difficulty) meta.appendChild(make('span', { text: t('diff.' + question.difficulty) }));
+    if (question.custom) meta.appendChild(make('span', { className: 'q-item__cat', text: t('library.custom') }));
+    if (question.custom && question.enabled === false) meta.appendChild(make('span', { text: t('library.off') }));
+    li.appendChild(meta);
+
+    if (question.description) {
+      li.appendChild(make('div', { className: 'q-item__desc', text: question.description }));
+    }
+    return li;
+  }
+
+  function handleLibraryChipClick(event) {
+    const chip = event.target.closest('button[data-filter]');
+    if (!chip) return;
+    ui.libFilter = chip.dataset.filter;
+    renderLibrary();
+    try { global.scrollTo(0, 0); } catch (err) { /* ignore */ }
+  }
+
   /* ---------- Settings ---------- */
 
   function renderSettings() {
@@ -1354,6 +1463,12 @@
     el.customList = need('custom-list');
     el.customEmpty = need('custom-empty');
 
+    el.libraryCount = need('library-count');
+    el.librarySearch = need('library-search');
+    el.libraryChips = need('library-chips');
+    el.libraryGroups = need('library-groups');
+    el.libraryEmpty = need('library-empty');
+
     el.settingsCategories = need('settings-categories');
     el.modeRandom = need('mode-random');
     el.modeManual = need('mode-manual');
@@ -1391,6 +1506,7 @@
       renderPlayers();
       renderGame();
       renderCreator();
+      renderLibrary();
       refreshFormLabels();
       renderSettings();
       if (el.historyDialog.open) renderHistory();
@@ -1429,6 +1545,14 @@
       el.filterCategory.addEventListener('change', renderCustomList);
       el.customList.addEventListener('click', handleCustomListClick);
       el.customList.addEventListener('change', handleCustomListChange);
+    });
+
+    safely('library', function () {
+      el.librarySearch.addEventListener('input', function () {
+        ui.libQuery = el.librarySearch.value;
+        renderLibrary();
+      });
+      el.libraryChips.addEventListener('click', handleLibraryChipClick);
     });
 
     safely('settings', function () {
