@@ -70,8 +70,17 @@
 
   /* ---------- Small helpers ---------- */
 
+  // Message in the current language (MESSAGES is the English fallback).
+  function messageFor(reason) {
+    try {
+      const key = 'msg.' + reason;
+      if (NOW.i18n && NOW.i18n.exists(key)) return NOW.i18n.t(key);
+    } catch (err) { /* use the fallback */ }
+    return MESSAGES[reason] || '';
+  }
+
   function fail(reason) {
-    return { ok: false, reason: reason, message: MESSAGES[reason] || '' };
+    return { ok: false, reason: reason, message: messageFor(reason) };
   }
 
   function isId(value) {
