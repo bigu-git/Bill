@@ -227,12 +227,20 @@
     return typeof value === 'string' ? value.trim() : '';
   }
 
+  // Translated text for a built-in category (falls back to the English source).
+  function tr(key, fallback) {
+    try {
+      if (NOW.i18n && NOW.i18n.exists(key)) return NOW.i18n.t(key);
+    } catch (err) { /* use the fallback */ }
+    return fallback;
+  }
+
   function toCategory(src, isBuiltIn) {
     return {
       id: src.id,
-      name: src.name,
+      name: isBuiltIn ? tr('cat.' + src.id + '.name', src.name) : src.name,
       color: src.color,
-      description: src.description || '',
+      description: isBuiltIn ? tr('cat.' + src.id + '.desc', src.description || '') : (src.description || ''),
       builtIn: isBuiltIn
     };
   }
@@ -301,10 +309,35 @@
 
   /* ---------- Questions ---------- */
 
+  // Built-in questions in the current language. Ids and difficulty never change;
+  // only text and the note come from NOW.questionTexts[lang] (js/questions-<lang>.js).
+  const localizedCache = {}; // lang -> category id -> frozen list
+
+  function builtInFor(key) {
+    const base = BUILT_IN_QUESTIONS[key];
+    if (!base) return [];
+    const code = NOW.i18n ? NOW.i18n.getLang() : 'en';
+    const pack = NOW.questionTexts && NOW.questionTexts[code];
+    const rows = pack && pack[key];
+    if (code === 'en' || !Array.isArray(rows)) return base;
+
+    const byLang = localizedCache[code] || (localizedCache[code] = {});
+    if (!byLang[key]) {
+      const note = pack.notes && pack.notes[key];
+      byLang[key] = Object.freeze(base.map(function (q, index) {
+        return Object.freeze(Object.assign({}, q, {
+          text: typeof rows[index] === 'string' && rows[index] ? rows[index] : q.text,
+          description: q.description && note ? note : q.description
+        }));
+      }));
+    }
+    return byLang[key];
+  }
+
   // Built-in questions of one category (a copy of the list; items are frozen).
   function getBuiltIn(categoryId) {
     const key = cleanCategoryId(categoryId);
-    return BUILT_IN_QUESTIONS[key] ? BUILT_IN_QUESTIONS[key].slice() : [];
+    return BUILT_IN_QUESTIONS[key] ? builtInFor(key).slice() : [];
   }
 
   // Shared collector. Without a category id it covers every category.
@@ -316,7 +349,7 @@
       result = getBuiltIn(key);
     } else {
       BUILT_IN_CATEGORIES.forEach(function (c) {
-        result = result.concat(BUILT_IN_QUESTIONS[c.id]);
+        result = result.concat(builtInFor(c.id));
       });
     }
 
