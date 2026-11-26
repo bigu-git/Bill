@@ -1373,3 +1373,56 @@ button.chip:active { transform: scale(0.95); }
     scroll-behavior: auto !important;
   }
 }
+
+/* ---------- 16. ALL CARDS (LIBRARY) ---------- */
+.screen--library .screen-head .badge { justify-self: end; }
+
+.lib-controls {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: grid;
+  gap: 10px;
+  margin: 0 -20px;
+  padding: 6px 20px 12px;
+  background: linear-gradient(to bottom, var(--bg) 88%, transparent);
+}
+
+.lib-chips {
+  flex-wrap: nowrap;
+  justify-content: flex-start;
+  margin: 0;
+  padding: 2px 20px 4px;
+  margin-inline: -20px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.lib-chips::-webkit-scrollbar { display: none; }
+.lib-chips li { flex: none; }
+
+.lib-chips .chip { cursor: pointer; white-space: nowrap; }
+.chip--all { --cat-accent: var(--text); }
+.chip__count {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-faint);
+}
+.chip.is-selected .chip__count { color: var(--text-dim); }
+
+.lib-groups { display: grid; gap: 26px; }
+
+.lib-group { display: grid; gap: 10px; }
+
+.lib-group__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-top: 4px;
+}
+.lib-group__title { flex: 1; font-size: 16px; font-weight: 700; }
+
+.lib-list { display: grid; gap: 8px; }
+
+.q-item--lib { padding: 12px 14px; gap: 0; }
+.q-item--lib .q-item__meta { margin-top: 8px; }
