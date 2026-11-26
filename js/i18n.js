@@ -48,6 +48,15 @@
       'home.create': 'Create questions',
       'home.howto': 'How to play',
       'home.settings': 'Settings',
+      'home.library': 'All cards',
+
+      'library.title': 'All cards',
+      'library.search': 'Search cards',
+      'library.filter': 'Filter by category',
+      'library.all': 'All',
+      'library.empty': 'No cards match your search.',
+      'library.custom': 'Custom',
+      'library.off': 'Off in game',
 
       'setup.title': 'Who\'s playing?',
       'setup.lead': 'Add 2 to 12 players, then pass the phone around.',
