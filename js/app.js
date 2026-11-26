@@ -553,6 +553,8 @@
     const disabled = new Set(settings.disabledCategories);
 
     el.modeLabel.textContent = t(manual ? 'game.mode.manual' : 'game.mode.random');
+    // Random mode: nothing to pick, so hide the whole block. Manual mode needs it.
+    el.categoryChips.parentElement.style.display = manual ? '' : 'none';
     clearChildren(el.categoryChips);
 
     NOW.questions.getCategories().forEach(function (category) {
