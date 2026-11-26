@@ -382,13 +382,12 @@
 
     const ready = players.length >= min;
     el.btnStartGame.disabled = !ready;
+    // With no players the lead text already states the rule, so the hint stays hidden.
+    el.setupHint.hidden = players.length === 0;
     if (ready) {
       el.setupHint.textContent = t('setup.ready', { players: plural(players.length, 'player') });
-    } else {
-      const missing = min - players.length;
-      el.setupHint.textContent = players.length
-        ? t('setup.need_more', { more: plural(missing, 'more player') })
-        : t('setup.need_min', { min: min });
+    } else if (players.length) {
+      el.setupHint.textContent = t('setup.need_more', { more: plural(min - players.length, 'more player') });
     }
   }
 
