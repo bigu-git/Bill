@@ -12,6 +12,7 @@
    - Unknown category ids never throw: lookups fall back safely.
    - Question shape (same for built-in and custom):
      { id, category, text, description, difficulty, enabled, custom, createdAt }
+     (built-in cards changed by the player also carry edited: true)
    ========================================================================== */
 (function (global) {
   'use strict';
@@ -221,6 +222,85 @@
 
   const BUILT_IN_IDS = new Set(BUILT_IN_CATEGORIES.map(function (c) { return c.id; }));
 
+  /* ---------- Edits to built-in cards ---------- */
+  // Built-in cards live in code, so the player's changes are stored on top of
+  // them (localStorage key "edits"):
+  //   { removed: [id, ...], changed: { id: { text, description, difficulty } } }
+  // "removed" cards are hidden from the game (and can be restored);
+  // "changed" cards replace the text / note / difficulty in every language.
+  const EDITS_KEY = 'edits';
+  const DIFFICULTIES = ['', 'easy', 'medium', 'hard'];
+  const BUILT_IN_BY_ID = Object.create(null);
+  BUILT_IN_CATEGORIES.forEach(function (c) {
+    BUILT_IN_QUESTIONS[c.id].forEach(function (item) { BUILT_IN_BY_ID[item.id] = item; });
+  });
+
+  function cleanText(value, max) {
+    return typeof value === 'string' ? value.replace(/\s+/g, ' ').trim().slice(0, max) : '';
+  }
+
+  // Never throws; bad or missing data gives "no edits".
+  function readEdits() {
+    const removed = new Set();
+    const changed = Object.create(null);
+    let raw = null;
+    try {
+      raw = NOW.storage ? NOW.storage.get(EDITS_KEY, null) : null;
+    } catch (err) {
+      raw = null;
+    }
+    if (raw && typeof raw === 'object') {
+      if (Array.isArray(raw.removed)) {
+        raw.removed.forEach(function (id) {
+          if (typeof id === 'string' && BUILT_IN_BY_ID[id]) removed.add(id);
+        });
+      }
+      if (raw.changed && typeof raw.changed === 'object') {
+        Object.keys(raw.changed).forEach(function (id) {
+          const c = raw.changed[id];
+          if (!BUILT_IN_BY_ID[id] || !c || typeof c !== 'object') return;
+          const text = cleanText(c.text, (NOW.config && NOW.config.TEXT_MAX) || 200);
+          if (!text) return;
+          changed[id] = {
+            text: text,
+            description: cleanText(c.description, (NOW.config && NOW.config.DESC_MAX) || 120),
+            difficulty: DIFFICULTIES.indexOf(c.difficulty) !== -1 ? c.difficulty : ''
+          };
+        });
+      }
+    }
+    return { removed: removed, changed: changed };
+  }
+
+  // Returns true when the value reached localStorage.
+  function writeEdits(state) {
+    try {
+      const changed = {};
+      Object.keys(state.changed).forEach(function (id) { changed[id] = state.changed[id]; });
+      return !!NOW.storage.set(EDITS_KEY, { removed: Array.from(state.removed), changed: changed });
+    } catch (err) {
+      return false;
+    }
+  }
+
+  // Applies the player's changes to a list of built-in cards (removed cards are dropped).
+  function applyEdits(list, edits) {
+    const out = [];
+    list.forEach(function (item) {
+      if (edits.removed.has(item.id)) return;
+      const c = edits.changed[item.id];
+      out.push(c
+        ? Object.freeze(Object.assign({}, item, {
+            text: c.text,
+            description: c.description,
+            difficulty: c.difficulty,
+            edited: true
+          }))
+        : item);
+    });
+    return out;
+  }
+
   /* ---------- Helpers ---------- */
 
   function cleanCategoryId(value) {
@@ -337,19 +417,20 @@
   // Built-in questions of one category (a copy of the list; items are frozen).
   function getBuiltIn(categoryId) {
     const key = cleanCategoryId(categoryId);
-    return BUILT_IN_QUESTIONS[key] ? builtInFor(key).slice() : [];
+    return BUILT_IN_QUESTIONS[key] ? applyEdits(builtInFor(key), readEdits()) : [];
   }
 
   // Shared collector. Without a category id it covers every category.
   function collect(categoryId, includeDisabled) {
     const key = cleanCategoryId(categoryId);
+    const edits = readEdits();
     let result = [];
 
     if (key) {
-      result = getBuiltIn(key);
+      result = BUILT_IN_QUESTIONS[key] ? applyEdits(builtInFor(key), edits) : [];
     } else {
       BUILT_IN_CATEGORIES.forEach(function (c) {
-        result = result.concat(builtInFor(c.id));
+        result = result.concat(applyEdits(builtInFor(c.id), edits));
       });
     }
 
@@ -382,6 +463,61 @@
     return null;
   }
 
+  /* ---------- Editing built-in cards ---------- */
+  // Each function returns true when the change was saved to localStorage.
+
+  function isBuiltInId(id) {
+    return typeof id === 'string' && !!BUILT_IN_BY_ID[id];
+  }
+
+  // Built-in cards the player removed (with their edits applied), in card order.
+  function getRemoved() {
+    const edits = readEdits();
+    const onlyChanges = { removed: new Set(), changed: edits.changed };
+    let out = [];
+    BUILT_IN_CATEGORIES.forEach(function (c) {
+      out = out.concat(applyEdits(builtInFor(c.id), onlyChanges).filter(function (item) {
+        return edits.removed.has(item.id);
+      }));
+    });
+    return out;
+  }
+
+  function editBuiltIn(id, data) {
+    if (!isBuiltInId(id) || !data) return false;
+    const text = cleanText(data.text, (NOW.config && NOW.config.TEXT_MAX) || 200);
+    if (!text) return false;
+    const state = readEdits();
+    state.changed[id] = {
+      text: text,
+      description: cleanText(data.description, (NOW.config && NOW.config.DESC_MAX) || 120),
+      difficulty: DIFFICULTIES.indexOf(data.difficulty) !== -1 ? data.difficulty : ''
+    };
+    return writeEdits(state);
+  }
+
+  // Drops the player's changes to one card (back to the original text).
+  function restoreOriginal(id) {
+    if (!isBuiltInId(id)) return false;
+    const state = readEdits();
+    delete state.changed[id];
+    return writeEdits(state);
+  }
+
+  function removeBuiltIn(id) {
+    if (!isBuiltInId(id)) return false;
+    const state = readEdits();
+    state.removed.add(id);
+    return writeEdits(state);
+  }
+
+  function restoreBuiltIn(id) {
+    if (!isBuiltInId(id)) return false;
+    const state = readEdits();
+    state.removed.delete(id);
+    return writeEdits(state);
+  }
+
   /* ---------- Public API ---------- */
   NOW.questions = Object.freeze({
     getCategories: getCategories,
@@ -391,6 +527,12 @@
     getBuiltIn: getBuiltIn,
     getAll: getAll,
     getAllIncludingDisabled: getAllIncludingDisabled,
-    getById: getById
+    getById: getById,
+    isBuiltInId: isBuiltInId,
+    getRemoved: getRemoved,
+    editBuiltIn: editBuiltIn,
+    restoreOriginal: restoreOriginal,
+    removeBuiltIn: removeBuiltIn,
+    restoreBuiltIn: restoreBuiltIn
   });
 })(window);
