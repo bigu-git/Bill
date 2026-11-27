@@ -13,7 +13,7 @@ Plain HTML, CSS and JavaScript. No frameworks, no build step, no backend, no acc
 - **6 categories**, each with 18 built-in questions: Spice, Drink, Free Pass, Truth, Challenge, Chaos.
 - **2 to 12 players** on one device, with automatic turn rotation and rounds.
 - **3D card flip** with a clear Done / Skip / Next player flow.
-- **All cards**: browse every card (built-in and custom) grouped by category, filter with the category chips, and search by text.
+- **All cards**: browse every card (built-in and custom) as mini cards grouped by category. Filter by category and difficulty, search by text (matches are highlighted), tap a card to open it full size (swipe or use the arrows to move between cards), and tap the star to save favourites (**Saved** filter). Open a card to **Edit** its text, note and difficulty or **Delete** it. Built-in cards are only hidden: they appear in the **Deleted** list, where they can be restored, and an edited built-in card can go back to its original text. Edits apply to every language. Custom cards are deleted for good.
 - **Custom questions**: create, edit, enable/disable and delete your own. They appear in real gameplay.
 - **Settings**: turn categories on or off, random or manual category choice, allow or forbid repeated questions.
 - **History** of the cards drawn in the current game.
