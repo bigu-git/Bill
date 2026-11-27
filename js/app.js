@@ -40,6 +40,15 @@
     editingId: '',          // custom question being edited ('' = new)
     libFilter: 'all',       // category id shown in All cards ('all' = every category)
     libQuery: '',           // search text in All cards
+    libLevel: 'all',        // difficulty filter in All cards ('all' | easy | medium | hard)
+    libFav: false,          // true = only saved cards
+    libTrash: false,        // true = showing the deleted built-in cards
+    libEditId: '',          // card open in the edit dialog
+    favorites: null,        // Set of saved card ids (loaded lazily from storage)
+    libView: [],            // cards currently shown: [{ q, number, category }]
+    libIndex: 0,            // position of the open preview inside libView
+    libOpenId: '',          // id of the card in the open preview
+    libDirty: false,        // saved cards changed while the preview was open
     removing: new Set(),    // player ids currently fading out
     toastTimer: 0,
     toastHideTimer: 0,
@@ -274,7 +283,7 @@
       if (name === 'setup') renderSetup();
       else if (name === 'game') onEnterGame();
       else if (name === 'creator') renderCreator();
-      else if (name === 'library') renderLibrary();
+      else if (name === 'library') renderLibrary(true);
       else if (name === 'settings') renderSettings();
     } catch (err) {
       reportError(t('err.screen'), err);
@@ -1188,6 +1197,16 @@
   }
 
   /* ---------- All cards (library) ---------- */
+  // Mini-card grid, filters (category, difficulty, saved), search with
+  // highlighting, and a full-size card preview with swipe / arrow navigation.
+  // Saved cards are stored under the "favorites" key (list of card ids).
+
+  const FAV_KEY = 'favorites';
+  const FAV_MAX = 1000;
+  const LEVELS = ['easy', 'medium', 'hard'];
+  const LONG_TEXT = 90;     // same thresholds as js/cards.js
+  const XLONG_TEXT = 140;
+  const THEME_VARS = ['--cat', '--cat-ink', '--cat-accent', '--cat-edge'];
 
   function normalizeSearch(text) {
     return String(text || '').toLowerCase().replace(/\s+/g, ' ').trim();
@@ -1198,29 +1217,184 @@
     return NOW.questions.getAllIncludingDisabled();
   }
 
-  function renderLibrary() {
+  /* -- Saved cards -- */
+
+  function favorites() {
+    if (ui.favorites) return ui.favorites;
+    let raw = [];
+    try { raw = NOW.storage.get(FAV_KEY, []); } catch (err) { raw = []; }
+    const set = new Set();
+    if (Array.isArray(raw)) {
+      raw.forEach(function (id) {
+        if (typeof id === 'string' && id && set.size < FAV_MAX) set.add(id);
+      });
+    }
+    ui.favorites = set;
+    return set;
+  }
+
+  function saveFavorites() {
+    try { NOW.storage.set(FAV_KEY, Array.from(favorites())); } catch (err) { /* memory only */ }
+  }
+
+  /* -- Small builders -- */
+
+  function levelOf(difficulty) {
+    return LEVELS.indexOf(difficulty) + 1; // 0 = no difficulty
+  }
+
+  // Three dots; the first `level` are filled.
+  function makePips(level, label) {
+    const wrap = make('span', {
+      className: 'pips',
+      attrs: label ? { role: 'img', 'aria-label': label } : { 'aria-hidden': 'true' }
+    });
+    for (let i = 1; i <= 3; i++) {
+      wrap.appendChild(make('span', { className: 'pips__dot' + (i <= level ? ' is-on' : '') }));
+    }
+    return wrap;
+  }
+
+  // Writes `text` into `node`, wrapping every match of `query` in <mark>.
+  function setHighlighted(node, text, query) {
+    const source = String(text || '');
+    const lower = source.toLowerCase();
+    let at = query && lower.length === source.length ? lower.indexOf(query) : -1;
+    if (at === -1) {
+      node.textContent = source;
+      return;
+    }
+    let pos = 0;
+    while (at !== -1) {
+      if (at > pos) node.appendChild(doc.createTextNode(source.slice(pos, at)));
+      node.appendChild(make('mark', { className: 'hl', text: source.slice(at, at + query.length) }));
+      pos = at + query.length;
+      at = lower.indexOf(query, pos);
+    }
+    if (pos < source.length) node.appendChild(doc.createTextNode(source.slice(pos)));
+  }
+
+  function buildLibraryTile(item, query, isFav, order) {
+    const question = item.q;
+    const li = make('li', { className: 'lib-item' });
+    li.style.setProperty('--i', String(Math.min(order, 16)));
+
+    const tile = make('button', {
+      className: 'lib-card' + (question.custom && question.enabled === false ? ' is-disabled' : '') + (ui.libTrash ? ' is-removed' : ''),
+      attrs: { type: 'button', 'aria-haspopup': 'dialog' },
+      dataset: { id: question.id }
+    });
+    applyCategoryTheme(tile, item.category);
+
+    const top = make('span', { className: 'lib-card__top' });
+    top.appendChild(make('span', { text: '#' + item.number }));
+    const star = make('span', { className: 'lib-card__fav' + (isFav ? ' is-on' : '') });
+    star.appendChild(makeIcon('star'));
+    star.appendChild(make('span', { className: 'sr-only', text: t('library.fav') }));
+    top.appendChild(star);
+    tile.appendChild(top);
+
+    const text = make('span', { className: 'lib-card__text' });
+    setHighlighted(text, question.text, query);
+    tile.appendChild(text);
+
+    const foot = make('span', { className: 'lib-card__foot' });
+    if (question.difficulty) {
+      foot.appendChild(makePips(levelOf(question.difficulty), t('diff.' + question.difficulty)));
+    }
+    if (question.custom) foot.appendChild(make('span', { className: 'lib-card__tag', text: t('library.custom') }));
+    if (question.edited) foot.appendChild(make('span', { className: 'lib-card__tag', text: t('library.edited') }));
+    if (question.custom && question.enabled === false) {
+      foot.appendChild(make('span', { className: 'lib-card__tag lib-card__tag--off', text: t('library.off') }));
+    }
+    tile.appendChild(foot);
+
+    li.appendChild(tile);
+    return li;
+  }
+
+  function findTile(id) {
+    const tiles = el.libraryGroups.querySelectorAll('.lib-card');
+    for (let i = 0; i < tiles.length; i++) {
+      if (tiles[i].dataset.id === id) return tiles[i];
+    }
+    return null;
+  }
+
+  function libraryFiltersActive() {
+    return !!(normalizeSearch(ui.libQuery) || ui.libFilter !== 'all' || ui.libLevel !== 'all' || ui.libFav || ui.libTrash);
+  }
+
+  /* -- Main render -- */
+
+  // animate = true plays the staggered entrance (screen open, filter change).
+  function renderLibrary(animate) {
     const categories = NOW.questions.getCategories();
-    const all = libraryCards();
+    const live = libraryCards();
+    const removedCards = NOW.questions.getRemoved();
+    if (ui.libTrash && !removedCards.length) ui.libTrash = false;
+    const all = ui.libTrash ? removedCards : live;
+    const saved = favorites();
     const query = normalizeSearch(ui.libQuery);
 
     if (ui.libFilter !== 'all' && !categories.some(function (c) { return c.id === ui.libFilter; })) {
       ui.libFilter = 'all';
     }
+    if (ui.libLevel !== 'all' && LEVELS.indexOf(ui.libLevel) === -1) ui.libLevel = 'all';
 
-    const matches = function (q) {
+    // Forget saved cards that no longer exist (deleted custom cards).
+    if (live.length) {
+      const known = new Set(live.concat(removedCards).map(function (q) { return q.id; }));
+      let pruned = false;
+      saved.forEach(function (id) {
+        if (!known.has(id)) { saved.delete(id); pruned = true; }
+      });
+      if (pruned) saveFavorites();
+    }
+
+    // Stable card numbers: position inside the category, whatever the filters.
+    // Built-in cards keep their original number even after others are deleted;
+    // custom cards are numbered after the last built-in card.
+    const numbers = {};
+    const builtMax = {};
+    const customCount = {};
+    const categoryNames = {};
+    categories.forEach(function (c) { categoryNames[c.id] = c.name; });
+    const builtNumber = function (q) { return parseInt(String(q.id).split('-').pop(), 10) || 0; };
+    live.concat(removedCards).forEach(function (q) {
+      if (q.custom) return;
+      builtMax[q.category] = Math.max(builtMax[q.category] || 0, builtNumber(q));
+    });
+    live.concat(removedCards).forEach(function (q) {
+      if (!q.custom) {
+        numbers[q.id] = builtNumber(q);
+      } else {
+        customCount[q.category] = (customCount[q.category] || 0) + 1;
+        numbers[q.id] = (builtMax[q.category] || 0) + customCount[q.category];
+      }
+    });
+
+    const matchesText = function (q) {
       if (!query) return true;
-      return normalizeSearch(q.text + ' ' + (q.description || '')).indexOf(query) !== -1;
+      const haystack = q.text + ' ' + (q.description || '') + ' ' + (categoryNames[q.category] || '');
+      return normalizeSearch(haystack).indexOf(query) !== -1;
     };
+    const base = all.filter(function (q) {
+      return matchesText(q) &&
+        (ui.libLevel === 'all' || q.difficulty === ui.libLevel) &&
+        (!ui.libFav || saved.has(q.id));
+    });
 
-    // Filter chips (counts follow the search text).
+    // Search box helpers.
+    el.libraryClear.hidden = !ui.libQuery;
+
+    // Category chips (counts follow every other filter).
     clearChildren(el.libraryChips);
     const chipData = [{ id: 'all', name: t('library.all'), category: null }].concat(
       categories.map(function (c) { return { id: c.id, name: c.name, category: c }; })
     );
     chipData.forEach(function (item) {
-      const count = all.filter(function (q) {
-        return (item.id === 'all' || q.category === item.id) && matches(q);
-      }).length;
+      const count = base.filter(function (q) { return item.id === 'all' || q.category === item.id; }).length;
       const chip = make('button', {
         className: 'chip' + (item.id === 'all' ? ' chip--all' : ''),
         attrs: { type: 'button', 'aria-pressed': ui.libFilter === item.id ? 'true' : 'false' },
@@ -1236,12 +1410,52 @@
       el.libraryChips.appendChild(make('li', {})).appendChild(chip);
     });
 
-    // Groups of cards.
+    // Saved + difficulty chips.
+    clearChildren(el.libraryFilters);
+    const favChip = make('button', {
+      className: 'chip chip--fav' + (ui.libFav ? ' is-selected' : ''),
+      attrs: { type: 'button', 'aria-pressed': ui.libFav ? 'true' : 'false' },
+      dataset: { fav: '1' }
+    });
+    favChip.appendChild(makeIcon('star'));
+    favChip.appendChild(doc.createTextNode(t('library.fav') + ' '));
+    favChip.appendChild(make('span', { className: 'chip__count', text: String(saved.size) }));
+    el.libraryFilters.appendChild(make('li', {})).appendChild(favChip);
+    if (removedCards.length) {
+      const trashChip = make('button', {
+        className: 'chip chip--trash' + (ui.libTrash ? ' is-selected' : ''),
+        attrs: { type: 'button', 'aria-pressed': ui.libTrash ? 'true' : 'false' },
+        dataset: { trash: '1' }
+      });
+      trashChip.appendChild(makeIcon('trash'));
+      trashChip.appendChild(doc.createTextNode(t('library.trash') + ' '));
+      trashChip.appendChild(make('span', { className: 'chip__count', text: String(removedCards.length) }));
+      el.libraryFilters.appendChild(make('li', {})).appendChild(trashChip);
+    }
+    el.libraryFilters.appendChild(make('li', { className: 'lib-filters__sep', attrs: { 'aria-hidden': 'true' } }));
+    ['all'].concat(LEVELS).forEach(function (level) {
+      const chip = make('button', {
+        className: 'chip' + (ui.libLevel === level ? ' is-selected' : ''),
+        attrs: { type: 'button', 'aria-pressed': ui.libLevel === level ? 'true' : 'false' },
+        dataset: { level: level }
+      });
+      if (level === 'all') {
+        chip.appendChild(doc.createTextNode(t('library.any_level')));
+      } else {
+        chip.appendChild(makePips(levelOf(level), null));
+        chip.appendChild(doc.createTextNode(t('diff.' + level)));
+      }
+      el.libraryFilters.appendChild(make('li', {})).appendChild(chip);
+    });
+
+    // Groups of mini cards.
     clearChildren(el.libraryGroups);
+    el.libraryGroups.classList.toggle('is-entering', !!animate && !prefersReducedMotion());
+    ui.libView = [];
     let shown = 0;
     categories.forEach(function (category) {
       if (ui.libFilter !== 'all' && ui.libFilter !== category.id) return;
-      const cards = all.filter(function (q) { return q.category === category.id && matches(q); });
+      const cards = base.filter(function (q) { return q.category === category.id; });
       if (!cards.length) return;
       shown += cards.length;
 
@@ -1254,43 +1468,368 @@
       head.appendChild(make('span', { className: 'badge', text: String(cards.length) }));
       group.appendChild(head);
 
-      const list = make('ul', { className: 'lib-list' });
-      cards.forEach(function (question, index) {
-        list.appendChild(buildLibraryItem(question, index + 1));
+      const grid = make('ul', { className: 'lib-grid' });
+      cards.forEach(function (question) {
+        const item = { q: question, number: numbers[question.id] || 0, category: category };
+        ui.libView.push(item);
+        grid.appendChild(buildLibraryTile(item, query, saved.has(question.id), ui.libView.length - 1));
       });
-      group.appendChild(list);
+      group.appendChild(grid);
       el.libraryGroups.appendChild(group);
     });
 
     el.libraryCount.textContent = String(shown);
     el.libraryEmpty.hidden = shown > 0;
-  }
-
-  function buildLibraryItem(question, number) {
-    const li = make('li', { className: 'q-item q-item--lib' });
-    if (question.custom && question.enabled === false) li.classList.add('is-disabled');
-
-    li.appendChild(make('div', { className: 'q-item__text', text: question.text }));
-
-    const meta = make('div', { className: 'q-item__meta' });
-    meta.appendChild(make('span', { text: '#' + number }));
-    if (question.difficulty) meta.appendChild(make('span', { text: t('diff.' + question.difficulty) }));
-    if (question.custom) meta.appendChild(make('span', { className: 'q-item__cat', text: t('library.custom') }));
-    if (question.custom && question.enabled === false) meta.appendChild(make('span', { text: t('library.off') }));
-    li.appendChild(meta);
-
-    if (question.description) {
-      li.appendChild(make('div', { className: 'q-item__desc', text: question.description }));
+    if (shown === 0) {
+      el.libraryEmptyText.textContent = ui.libFav && saved.size === 0 && !query && ui.libLevel === 'all'
+        ? t('library.no_fav')
+        : t('library.empty');
+      el.libraryReset.hidden = !libraryFiltersActive();
     }
-    return li;
+
+    if (el.libDialog.open) syncPreviewAfterRender();
   }
+
+  /* -- Filter events -- */
 
   function handleLibraryChipClick(event) {
     const chip = event.target.closest('button[data-filter]');
     if (!chip) return;
     ui.libFilter = chip.dataset.filter;
-    renderLibrary();
+    renderLibrary(true);
     try { global.scrollTo(0, 0); } catch (err) { /* ignore */ }
+  }
+
+  function handleLibraryFilterClick(event) {
+    const chip = event.target.closest('button.chip');
+    if (!chip) return;
+    if (chip.dataset.fav) ui.libFav = !ui.libFav;
+    else if (chip.dataset.trash) ui.libTrash = !ui.libTrash;
+    else if (chip.dataset.level) ui.libLevel = chip.dataset.level;
+    else return;
+    renderLibrary(true);
+  }
+
+  function clearLibrarySearch() {
+    ui.libQuery = '';
+    el.librarySearch.value = '';
+    renderLibrary(false);
+    try { el.librarySearch.focus(); } catch (err) { /* ignore */ }
+  }
+
+  function resetLibraryFilters() {
+    ui.libQuery = '';
+    ui.libFilter = 'all';
+    ui.libLevel = 'all';
+    ui.libFav = false;
+    ui.libTrash = false;
+    el.librarySearch.value = '';
+    renderLibrary(true);
+  }
+
+  /* -- Card preview -- */
+
+  function resetPreviewTheme() {
+    THEME_VARS.forEach(function (name) { el.libCard.style.removeProperty(name); });
+  }
+
+  // direction: null (opening) | 'next' | 'prev' | 'none' (no animation)
+  function renderPreview(direction) {
+    const item = ui.libView[ui.libIndex];
+    if (!item) return;
+    const question = item.q;
+    ui.libOpenId = question.id;
+
+    resetPreviewTheme();
+    applyCategoryTheme(el.libCard, item.category);
+
+    el.libCardCat.textContent = item.category.name;
+    el.libCardNum.textContent = '#' + item.number;
+
+    el.libCardText.textContent = question.text;
+    const length = Array.from(question.text).length;
+    el.libCardText.classList.toggle('is-long', length > LONG_TEXT);
+    el.libCardText.classList.toggle('is-xlong', length > XLONG_TEXT);
+
+    el.libCardNote.textContent = question.description || '';
+    el.libCardNote.hidden = !question.description;
+
+    el.libCardDiff.textContent = question.difficulty ? t('diff.' + question.difficulty) : '';
+    el.libCardDiff.hidden = !question.difficulty;
+
+    const total = ui.libView.length;
+    el.libPos.textContent = (ui.libIndex + 1) + ' / ' + total;
+    el.libPrev.disabled = total < 2;
+    el.libNext.disabled = total < 2;
+    syncPreviewFavorite(false);
+    el.libEdit.hidden = ui.libTrash;
+    el.libDelete.hidden = ui.libTrash;
+    el.libRestore.hidden = !ui.libTrash;
+
+    el.libCard.classList.remove('is-opening', 'is-next', 'is-prev');
+    if (direction && direction !== 'none' && !prefersReducedMotion()) {
+      void el.libCard.offsetWidth; // restart the animation
+      el.libCard.classList.add(direction === 'next' ? 'is-next' : 'is-prev');
+    } else if (!direction && !prefersReducedMotion()) {
+      void el.libCard.offsetWidth;
+      el.libCard.classList.add('is-opening');
+    }
+  }
+
+  function syncPreviewFavorite(pop) {
+    const item = ui.libView[ui.libIndex];
+    const isFav = !!item && favorites().has(item.q.id);
+    el.libFav.setAttribute('aria-pressed', isFav ? 'true' : 'false');
+    el.libFav.setAttribute('aria-label', t(isFav ? 'library.fav_remove' : 'library.fav_add'));
+    el.libFav.classList.remove('is-pop');
+    if (pop && !prefersReducedMotion()) {
+      void el.libFav.offsetWidth;
+      el.libFav.classList.add('is-pop');
+    }
+  }
+
+  function openLibraryPreview(id) {
+    let index = -1;
+    for (let i = 0; i < ui.libView.length; i++) {
+      if (ui.libView[i].q.id === id) { index = i; break; }
+    }
+    if (index < 0) return;
+    ui.libIndex = index;
+    ui.libDirty = false;
+    renderPreview(null);
+    openDialog(el.libDialog);
+    try { el.libClose.focus({ preventScroll: true }); } catch (err) { /* ignore */ }
+  }
+
+  function stepPreview(direction) {
+    const total = ui.libView.length;
+    if (total < 2) return;
+    ui.libIndex = (ui.libIndex + direction + total) % total;
+    renderPreview(direction > 0 ? 'next' : 'prev');
+  }
+
+  function toggleLibraryFavorite() {
+    const item = ui.libView[ui.libIndex];
+    if (!item) return;
+    const saved = favorites();
+    const id = item.q.id;
+    if (saved.has(id)) {
+      saved.delete(id);
+    } else {
+      if (saved.size >= FAV_MAX) return;
+      saved.add(id);
+    }
+    saveFavorites();
+    ui.libDirty = true;
+    syncPreviewFavorite(true);
+
+    // Update the tile behind the dialog in place (full redraw happens on close).
+    const tile = findTile(id);
+    if (tile) {
+      const star = tile.querySelector('.lib-card__fav');
+      if (star) star.classList.toggle('is-on', saved.has(id));
+    }
+  }
+
+  // The grid was rebuilt while the preview is open (e.g. language switch).
+  function syncPreviewAfterRender() {
+    let index = -1;
+    for (let i = 0; i < ui.libView.length; i++) {
+      if (ui.libView[i].q.id === ui.libOpenId) { index = i; break; }
+    }
+    if (index < 0) {
+      ui.libOpenId = '';
+      closeDialog(el.libDialog);
+      return;
+    }
+    ui.libIndex = index;
+    renderPreview('none');
+  }
+
+  function handlePreviewClose() {
+    const id = ui.libOpenId;
+    if (ui.libDirty) {
+      ui.libDirty = false;
+      try { renderLibrary(false); } catch (err) { reportError(t('err.screen'), err); }
+    }
+    const tile = id ? findTile(id) : null;
+    if (tile) {
+      try {
+        tile.scrollIntoView({ block: 'center' });
+        tile.focus({ preventScroll: true });
+      } catch (err) { /* ignore */ }
+    }
+  }
+
+  function handleLibraryTileClick(event) {
+    const tile = event.target.closest('.lib-card');
+    if (tile) openLibraryPreview(tile.dataset.id);
+  }
+
+  /* -- Edit / delete / restore -- */
+
+  // Call after any change to the cards. nextId = the card the preview should
+  // show afterwards ('' closes it, e.g. when the last card was deleted).
+  function afterCardsChanged(nextId) {
+    try {
+      NOW.game.rebuildQueues();
+    } catch (err) {
+      reportError(t('err.refresh_saved'), err);
+    }
+    ui.libOpenId = nextId;
+    ui.libDirty = false;
+    renderLibrary(false);
+  }
+
+  function neighborId() {
+    const next = ui.libView[ui.libIndex + 1] || ui.libView[ui.libIndex - 1];
+    return next ? next.q.id : '';
+  }
+
+  function deleteLibraryCard() {
+    const item = ui.libView[ui.libIndex];
+    if (!item || ui.libTrash) return;
+    const question = item.q;
+    const custom = !!question.custom;
+    confirmAction({
+      title: t(custom ? 'creator.del.title' : 'library.del.title'),
+      message: custom ? t('creator.del.msg', { text: question.text }) : t('library.del.msg'),
+      okLabel: t(custom ? 'creator.del.ok' : 'library.del.ok')
+    }).then(function (ok) {
+      if (!ok) return;
+      const next = neighborId();
+      if (custom) {
+        persistCustomQuestions(readCustomQuestions().filter(function (c) { return c.id !== question.id; }));
+      } else if (!NOW.questions.removeBuiltIn(question.id)) {
+        warnNotPersisted();
+      }
+      afterCardsChanged(next);
+    });
+  }
+
+  function restoreLibraryCard() {
+    const item = ui.libView[ui.libIndex];
+    if (!item || !ui.libTrash) return;
+    const next = neighborId();
+    if (!NOW.questions.restoreBuiltIn(item.q.id)) warnNotPersisted();
+    afterCardsChanged(next);
+  }
+
+  function openLibraryEdit() {
+    const item = ui.libView[ui.libIndex];
+    if (!item || ui.libTrash) return;
+    ui.libEditId = item.q.id;
+    clearFieldError(el.libEditError, [el.libEditText]);
+    el.libEditText.value = item.q.text;
+    el.libEditDesc.value = item.q.description || '';
+    el.libEditDiff.value = item.q.difficulty || '';
+    el.libEditOriginal.hidden = !item.q.edited;
+    openDialog(el.libEditDialog);
+    try { el.libEditText.focus(); } catch (err) { /* ignore */ }
+  }
+
+  function currentEditItem() {
+    for (let i = 0; i < ui.libView.length; i++) {
+      if (ui.libView[i].q.id === ui.libEditId) return ui.libView[i];
+    }
+    return null;
+  }
+
+  function saveLibraryEdit(event) {
+    event.preventDefault();
+    const item = currentEditItem();
+    if (!item) {
+      closeDialog(el.libEditDialog);
+      return;
+    }
+    const question = item.q;
+    const text = el.libEditText.value.replace(/\s+/g, ' ').trim();
+    const description = el.libEditDesc.value.replace(/\s+/g, ' ').trim();
+    const difficulty = el.libEditDiff.value;
+
+    if (!text) {
+      showFieldError(el.libEditError, t('creator.err.empty'), el.libEditText);
+      return;
+    }
+    if (Array.from(text).length < MIN_QUESTION_CHARS) {
+      showFieldError(el.libEditError, t('creator.err.short', { min: MIN_QUESTION_CHARS }), el.libEditText);
+      return;
+    }
+    if (text === question.text && description === (question.description || '') && difficulty === (question.difficulty || '')) {
+      closeDialog(el.libEditDialog);
+      return;
+    }
+
+    if (question.custom) {
+      const list = readCustomQuestions();
+      const target = list.filter(function (c) { return c.id === question.id; })[0];
+      if (target) {
+        target.text = text;
+        target.description = description;
+        target.difficulty = difficulty;
+        persistCustomQuestions(list);
+      }
+    } else if (!NOW.questions.editBuiltIn(question.id, { text: text, description: description, difficulty: difficulty })) {
+      warnNotPersisted();
+    }
+    closeDialog(el.libEditDialog);
+    afterCardsChanged(question.id);
+  }
+
+  function restoreOriginalCard() {
+    const item = currentEditItem();
+    if (!item) {
+      closeDialog(el.libEditDialog);
+      return;
+    }
+    if (!NOW.questions.restoreOriginal(item.q.id)) warnNotPersisted();
+    closeDialog(el.libEditDialog);
+    afterCardsChanged(item.q.id);
+  }
+
+  function bindLibraryEditing() {
+    el.libEdit.addEventListener('click', openLibraryEdit);
+    el.libDelete.addEventListener('click', deleteLibraryCard);
+    el.libRestore.addEventListener('click', restoreLibraryCard);
+    el.libEditForm.addEventListener('submit', saveLibraryEdit);
+    el.libEditCancel.addEventListener('click', function () { closeDialog(el.libEditDialog); });
+    el.libEditClose.addEventListener('click', function () { closeDialog(el.libEditDialog); });
+    el.libEditOriginal.addEventListener('click', restoreOriginalCard);
+    el.libEditText.addEventListener('input', function () {
+      clearFieldError(el.libEditError, [el.libEditText]);
+    });
+    el.libEditDialog.addEventListener('click', function (event) {
+      if (event.target === el.libEditDialog) closeDialog(el.libEditDialog);
+    });
+  }
+
+  function bindLibraryPreview() {
+    el.libPrev.addEventListener('click', function () { stepPreview(-1); });
+    el.libNext.addEventListener('click', function () { stepPreview(1); });
+    el.libFav.addEventListener('click', toggleLibraryFavorite);
+    el.libClose.addEventListener('click', function () { closeDialog(el.libDialog); });
+    el.libDialog.addEventListener('close', handlePreviewClose);
+    el.libDialog.addEventListener('click', function (event) {
+      if (event.target === el.libDialog) closeDialog(el.libDialog);
+    });
+    el.libDialog.addEventListener('keydown', function (event) {
+      if (event.key === 'ArrowLeft') { event.preventDefault(); stepPreview(-1); }
+      else if (event.key === 'ArrowRight') { event.preventDefault(); stepPreview(1); }
+    });
+
+    // Swipe left / right on the card.
+    let swipe = null;
+    el.libCard.addEventListener('pointerdown', function (event) {
+      swipe = { x: event.clientX, y: event.clientY };
+    });
+    el.libCard.addEventListener('pointerup', function (event) {
+      if (!swipe) return;
+      const dx = event.clientX - swipe.x;
+      const dy = event.clientY - swipe.y;
+      swipe = null;
+      if (Math.abs(dx) > 48 && Math.abs(dx) > Math.abs(dy) * 1.5) stepPreview(dx < 0 ? 1 : -1);
+    });
+    el.libCard.addEventListener('pointercancel', function () { swipe = null; });
   }
 
   /* ---------- Settings ---------- */
@@ -1468,6 +2007,34 @@
     el.libraryChips = need('library-chips');
     el.libraryGroups = need('library-groups');
     el.libraryEmpty = need('library-empty');
+    el.libraryEmptyText = need('library-empty-text');
+    el.libraryReset = need('library-reset');
+    el.libraryClear = need('library-clear');
+    el.libraryFilters = need('library-filters');
+    el.libDialog = need('lib-dialog');
+    el.libPos = need('lib-pos');
+    el.libFav = need('lib-fav');
+    el.libClose = need('lib-close');
+    el.libPrev = need('lib-prev');
+    el.libNext = need('lib-next');
+    el.libCard = need('lib-card');
+    el.libCardCat = need('lib-card-cat');
+    el.libCardNum = need('lib-card-num');
+    el.libCardText = need('lib-card-text');
+    el.libCardNote = need('lib-card-note');
+    el.libCardDiff = need('lib-card-diff');
+    el.libEdit = need('lib-edit');
+    el.libDelete = need('lib-delete');
+    el.libRestore = need('lib-restore');
+    el.libEditDialog = need('lib-edit-dialog');
+    el.libEditForm = need('lib-edit-form');
+    el.libEditText = need('lib-edit-text');
+    el.libEditDiff = need('lib-edit-diff');
+    el.libEditDesc = need('lib-edit-desc');
+    el.libEditError = need('lib-edit-error');
+    el.libEditOriginal = need('lib-edit-original');
+    el.libEditCancel = need('lib-edit-cancel');
+    el.libEditClose = need('lib-edit-close');
 
     el.settingsCategories = need('settings-categories');
     el.modeRandom = need('mode-random');
@@ -1550,9 +2117,15 @@
     safely('library', function () {
       el.librarySearch.addEventListener('input', function () {
         ui.libQuery = el.librarySearch.value;
-        renderLibrary();
+        renderLibrary(false);
       });
+      el.libraryClear.addEventListener('click', clearLibrarySearch);
       el.libraryChips.addEventListener('click', handleLibraryChipClick);
+      el.libraryFilters.addEventListener('click', handleLibraryFilterClick);
+      el.libraryGroups.addEventListener('click', handleLibraryTileClick);
+      el.libraryReset.addEventListener('click', resetLibraryFilters);
+      bindLibraryPreview();
+      bindLibraryEditing();
     });
 
     safely('settings', function () {
