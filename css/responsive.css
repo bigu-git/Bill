@@ -137,6 +137,7 @@
 
 /* ---------- 5. TABLET (600px and up) ---------- */
 @media (min-width: 600px) {
+  .lib-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .screen {
     --gutter: 32px;
     max-width: 640px;
@@ -194,7 +195,7 @@
   .screen--game { max-width: 760px; }
   .screen--howto { max-width: 720px; }
   .screen--library { max-width: 920px; }
-  .lib-list { grid-template-columns: 1fr 1fr; }
+  .lib-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 
   .home__fan { height: 210px; margin-bottom: 44px; }
   .fan-card { width: 100px; height: 142px; margin-left: -50px; }
