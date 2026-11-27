@@ -28,6 +28,8 @@
     <symbol id="icon-edit" viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16v4z"/><path d="M13.5 6.5l4 4"/></symbol>
     <symbol id="icon-trash" viewBox="0 0 24 24"><path d="M5 7h14M10 11v6M14 11v6M7 7l1 12h8l1-12M9 7V4h6v3"/></symbol>
     <symbol id="icon-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+    <symbol id="icon-next" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></symbol>
+    <symbol id="icon-star" viewBox="0 0 24 24"><path d="M12 3.5l2.7 5.6 6.1.8-4.5 4.2 1.1 6L12 17.1 6.6 20.1l1.1-6-4.5-4.2 6.1-.8z"/></symbol>
   </svg>
 
   <!-- Subtle animated background -->
@@ -350,14 +352,23 @@
       </header>
 
       <div class="lib-controls">
-        <label class="sr-only" for="library-search" data-i18n="library.search">Search cards</label>
-        <input class="input" id="library-search" type="search" maxlength="60" placeholder="Search cards" data-i18n-attr="placeholder:library.search" enterkeyhint="search" autocomplete="off">
+        <div class="lib-search">
+          <label class="sr-only" for="library-search" data-i18n="library.search">Search cards</label>
+          <input class="input" id="library-search" type="search" maxlength="60" placeholder="Search cards" data-i18n-attr="placeholder:library.search" enterkeyhint="search" autocomplete="off">
+          <button class="icon-btn icon-btn--sm lib-search__clear" id="library-clear" type="button" aria-label="Clear search" data-i18n-attr="aria-label:library.clear" hidden>
+            <svg class="icon" aria-hidden="true" focusable="false"><use href="#icon-close"></use></svg>
+          </button>
+        </div>
         <ul class="chips lib-chips" id="library-chips" aria-label="Filter by category" data-i18n-attr="aria-label:library.filter"></ul>
       </div>
 
       <div class="screen-body">
+        <ul class="chips lib-filters" id="library-filters" aria-label="Filter by difficulty" data-i18n-attr="aria-label:library.level"></ul>
         <div class="lib-groups" id="library-groups"></div>
-        <p class="empty" id="library-empty" data-i18n="library.empty" hidden>No cards match your search.</p>
+        <div class="empty lib-empty" id="library-empty" hidden>
+          <p id="library-empty-text"></p>
+          <button class="btn btn--ghost btn--sm" id="library-reset" type="button" data-i18n="library.reset">Clear filters</button>
+        </div>
       </div>
     </section>
 
@@ -430,6 +441,97 @@
       <ol class="history-list" id="history-list" aria-label="Cards drawn this game" data-i18n-attr="aria-label:history.aria"></ol>
       <p class="empty" id="history-empty" data-i18n="history.empty">No cards drawn yet.</p>
     </div>
+  </dialog>
+
+  <!-- Library: full-size card preview -->
+  <dialog class="dialog dialog--preview" id="lib-dialog" aria-label="Card preview" data-i18n-attr="aria-label:library.preview">
+    <div class="preview">
+      <div class="preview__bar">
+        <span class="preview__pos" id="lib-pos" aria-live="polite">1 / 1</span>
+        <button class="icon-btn icon-btn--sm preview__fav" id="lib-fav" type="button" aria-pressed="false" aria-label="Save card">
+          <svg class="icon" aria-hidden="true" focusable="false"><use href="#icon-star"></use></svg>
+        </button>
+        <button class="icon-btn icon-btn--sm" id="lib-close" type="button" aria-label="Close" data-i18n-attr="aria-label:library.close">
+          <svg class="icon" aria-hidden="true" focusable="false"><use href="#icon-close"></use></svg>
+        </button>
+      </div>
+
+      <article class="pcard" id="lib-card" data-cat="">
+        <div class="pcard__top">
+          <span class="pcard__cat" id="lib-card-cat"></span>
+          <span class="pcard__num" id="lib-card-num"></span>
+        </div>
+        <div class="pcard__body">
+          <p class="pcard__text" id="lib-card-text"></p>
+          <p class="pcard__note" id="lib-card-note" hidden></p>
+        </div>
+        <div class="pcard__bottom">
+          <span class="pcard__diff" id="lib-card-diff" hidden></span>
+          <span class="pcard__brand" aria-hidden="true">NOW OR NEVER</span>
+        </div>
+      </article>
+
+      <div class="preview__nav">
+        <button class="icon-btn preview__step" id="lib-prev" type="button" aria-label="Previous card" data-i18n-attr="aria-label:library.prev">
+          <svg class="icon" aria-hidden="true" focusable="false"><use href="#icon-back"></use></svg>
+        </button>
+        <button class="icon-btn preview__step" id="lib-next" type="button" aria-label="Next card" data-i18n-attr="aria-label:library.next">
+          <svg class="icon" aria-hidden="true" focusable="false"><use href="#icon-next"></use></svg>
+        </button>
+      </div>
+
+      <div class="preview__actions">
+        <button class="btn btn--ghost btn--sm" id="lib-edit" type="button">
+          <svg class="icon" aria-hidden="true" focusable="false"><use href="#icon-edit"></use></svg>
+          <span data-i18n="library.edit">Edit</span>
+        </button>
+        <button class="btn btn--ghost btn--sm" id="lib-delete" type="button">
+          <svg class="icon" aria-hidden="true" focusable="false"><use href="#icon-trash"></use></svg>
+          <span data-i18n="library.delete">Delete</span>
+        </button>
+        <button class="btn btn--primary btn--sm" id="lib-restore" type="button" hidden data-i18n="library.restore">Restore</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- Library: edit a card -->
+  <dialog class="dialog dialog--edit" id="lib-edit-dialog" aria-labelledby="lib-edit-title">
+    <form class="dialog__panel" id="lib-edit-form" novalidate>
+      <div class="dialog__head">
+        <h2 class="dialog__title" id="lib-edit-title" data-i18n="library.edit_title">Edit card</h2>
+        <button class="icon-btn icon-btn--sm" id="lib-edit-close" type="button" aria-label="Close" data-i18n-attr="aria-label:library.close">
+          <svg class="icon" aria-hidden="true" focusable="false"><use href="#icon-close"></use></svg>
+        </button>
+      </div>
+
+      <div class="field">
+        <label class="label" for="lib-edit-text" data-i18n="creator.q">Question or challenge</label>
+        <textarea class="input input--area" id="lib-edit-text" rows="4" maxlength="200" required></textarea>
+      </div>
+
+      <div class="field">
+        <label class="label" for="lib-edit-diff" data-i18n="creator.diff">Difficulty</label>
+        <select class="input" id="lib-edit-diff">
+          <option value="" data-i18n="diff.none">None</option>
+          <option value="easy" data-i18n="diff.easy">Easy</option>
+          <option value="medium" data-i18n="diff.medium">Medium</option>
+          <option value="hard" data-i18n="diff.hard">Hard</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label class="label" for="lib-edit-desc" data-i18n="creator.desc">Description</label>
+        <input class="input" id="lib-edit-desc" type="text" maxlength="120" placeholder="A short hint or rule for this card" data-i18n-attr="placeholder:creator.desc_ph">
+      </div>
+
+      <p class="form-error" id="lib-edit-error" role="alert" hidden></p>
+
+      <div class="dialog__actions">
+        <button class="btn btn--ghost" id="lib-edit-cancel" type="button" data-i18n="creator.cancel">Cancel</button>
+        <button class="btn btn--primary" id="lib-edit-save" type="submit" data-i18n="creator.save">Save changes</button>
+      </div>
+      <button class="btn btn--ghost btn--sm" id="lib-edit-original" type="button" hidden data-i18n="library.edit_original">Restore original</button>
+    </form>
   </dialog>
 
   <!-- Confirmation (destructive actions) -->
