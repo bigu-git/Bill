@@ -1,7 +1,7 @@
 /* NOW OR NEVER — sw.js
    Offline cache for the app shell. Change CACHE_VERSION whenever you
    upload new files, so phones drop the old copy. */
-const CACHE_VERSION = 'now-or-never-v9';
+const CACHE_VERSION = 'now-or-never-v11';
 
 const SHELL = [
   './',
